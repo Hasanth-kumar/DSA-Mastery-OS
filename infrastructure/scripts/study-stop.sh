@@ -4,7 +4,9 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUN_DIR="$REPO_ROOT/.study"
-API_URL="${API_URL:-http://localhost:3000}"
+BACKEND_PORT="${BACKEND_PORT:-${PORT:-3000}}"
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+API_URL="${API_URL:-http://localhost:${BACKEND_PORT}}"
 
 echo "■ DSA Mastery OS — stopping"
 
@@ -38,7 +40,7 @@ for name in backend frontend; do
   fi
 done
 
-for port in 3000 5173; do
+for port in "$BACKEND_PORT" "$FRONTEND_PORT"; do
   pids=$(lsof -ti tcp:"$port" 2>/dev/null || true)
   if [ -n "$pids" ]; then
     echo "$pids" | xargs kill >/dev/null 2>&1 || true

@@ -3,7 +3,7 @@
 ## Status board
 | Task | Status | Commit | Notes |
 |---|---|---|---|
-| P0.1 | todo | | |
+| P0.1 | done | | isolation env vars + Notion/WhatsApp write guards |
 | P0.2 | todo | | |
 | P0.3 | todo | | |
 | P1.1 | todo | | |
@@ -38,6 +38,13 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-19 — P0.1 Make data paths and external integrations configurable
+- Did: Routed the DB path (`DSA_DB_PATH` overrides `SQLITE_PATH`), backend/frontend ports (`BACKEND_PORT`, `FRONTEND_PORT`), Obsidian vault (already `OBSIDIAN_VAULT_PATH`), and Redis settings (`REDIS_URL`, `REDIS_PREFIX`) through `loadConfig`. Notion writes and WhatsApp sends are logged no-ops when `NOTION_WRITE_ENABLED=false` / `WHATSAPP_ENABLED=false`. `NOTION_SYNC_ENABLED=false` skips Notion pull/push and uses the local card export. `LLM_PROVIDER=mock|disabled` never calls OpenRouter or Ollama. Defaults stay on so an unset live `.env` keeps today's behavior. Documented the vars in `infrastructure/.env.example`.
+- Tests: `pnpm build` (no `pnpm typecheck` script), `pnpm lint`, and `pnpm test` passed. New coverage: config routing, Notion client write guard, card-bank push guard, WhatsApp send guard, mock LLM.
+- Data check: code-only mode — no `.env`, no credentials, no `data/dev/dsa.dev.db`. Did not start the app and did not create a dev database. Startup log grep from the acceptance note is still local-only.
+- Surprises / plan corrections: there is no Redis client in the repo; the prefix and URL are stored on config and unused. A disabled card push reports every card as failed so dirty rows are not marked synced.
+- Next suggested task: P0.2
+
 ### 2026-10-19 — Setup
 - Did: isolated worktree created from the focus-planner WIP. No overhaul task started.
 - Tests: not run (setup only)

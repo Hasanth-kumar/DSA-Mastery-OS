@@ -72,6 +72,18 @@ async function main() {
   try {
     await app.listen({ port: config.port, host: "0.0.0.0" });
     app.log.info(`API listening on http://localhost:${config.port}`);
+    app.log.info(`SQLite ${config.sqlite.path}`);
+    if (!config.notion.syncEnabled || !config.notion.writeEnabled) {
+      app.log.info(
+        `Notion isolation: sync=${config.notion.syncEnabled} writes=${config.notion.writeEnabled}`,
+      );
+    }
+    if (!config.whatsapp.enabled) {
+      app.log.info("WhatsApp sends disabled (WHATSAPP_ENABLED=false)");
+    }
+    if (config.llm.provider !== "openrouter") {
+      app.log.info(`LLM provider ${config.llm.provider} (no outbound calls)`);
+    }
     if (config.schedulers.enabled) {
       app.log.info("Weekly digest scheduler active (in-process cron — daily pushes removed)");
     }

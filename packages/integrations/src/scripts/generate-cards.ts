@@ -15,11 +15,9 @@ import { fileURLToPath } from "node:url";
 import { loadConfig } from "@dsa/shared";
 import { createSqliteDb, runMigrations } from "../sqlite/client.js";
 import { createOllamaEmbedder } from "../embeddings/index.js";
-import { createOpenRouterClient } from "../llm/OpenRouterClient.js";
 import {
   CardGenerationService,
-  createGenerationClient,
-  createOllamaGenerationClient,
+  createBatchGenerationClient,
   createSeedVocabularyResolver,
   createDbNoteProvider,
   markTopicDirty,
@@ -48,15 +46,16 @@ async function main(): Promise<void> {
 
     const localModel = process.env.OLLAMA_GEN_MODEL ?? DEFAULT_OLLAMA_GEN_MODEL;
     const cloudModel = cfg.llm.model;
-    const llm = createGenerationClient({
-      local: createOllamaGenerationClient({ model: localModel }),
-      cloud: createOpenRouterClient({
+    const llm = createBatchGenerationClient({
+      provider: cfg.llm.provider,
+      localModel,
+      cloud: {
         apiKey: cfg.llm.openrouter.apiKey ?? "",
         model: cloudModel,
         baseUrl: cfg.llm.openrouter.baseUrl,
         siteUrl: cfg.llm.openrouter.siteUrl,
         siteName: cfg.llm.openrouter.siteName,
-      }),
+      },
     });
 
     const service = new CardGenerationService({

@@ -12,6 +12,10 @@ const repoRoot = resolve(fileURLToPath(new URL("../../../..", import.meta.url)))
 
 async function main() {
   const cfg = loadConfig(resolve(repoRoot, ".env"));
+  if (!cfg.notion.syncEnabled) {
+    console.warn("[notion] seed skipped: NOTION_SYNC_ENABLED=false");
+    return;
+  }
   const notion = createNotionClient(cfg.notion);
   const result = await syncNotionToSqlite(notion, cfg.sqlite.path);
 

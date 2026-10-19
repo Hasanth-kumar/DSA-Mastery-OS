@@ -16,9 +16,34 @@ export function findRepoRoot(startDir = process.cwd()): string {
   return resolve(startDir);
 }
 
+/** Treat blank env values as unset so defaults still apply. */
+function emptyToUndefined(value: unknown): unknown {
+  if (typeof value === "string" && value.trim() === "") return undefined;
+  return value;
+}
+
+const boolFlag = (defaultValue: "true" | "false") =>
+  z.preprocess(
+    emptyToUndefined,
+    z
+      .enum(["true", "false"])
+      .default(defaultValue)
+      .transform((v) => v === "true"),
+  );
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   PORT: z.coerce.number().default(3000),
+  /** Preferred backend listen port. Overrides `PORT` when set (overhaul isolation). */
+  BACKEND_PORT: z.preprocess(
+    emptyToUndefined,
+    z.coerce.number().int().positive().optional(),
+  ),
+  /** Vite dev-server port. */
+  FRONTEND_PORT: z.preprocess(
+    emptyToUndefined,
+    z.coerce.number().int().positive().default(5173),
+  ),
   LOG_LEVEL: z
     .enum(["fatal", "error", "warn", "info", "debug", "trace"])
     .default("info"),
@@ -31,6 +56,13 @@ const envSchema = z.object({
   NOTION_SESSIONS_DB_ID: z.string().optional(),
   /** Optional Notion card bank database (one row per card — §8). Falls back to local JSON export. */
   NOTION_CARDS_DB_ID: z.string().optional(),
+  /**
+   * When false, Notion adapter writes (pages, schema, archives) are logged no-ops.
+   * Default true so an unset live `.env` keeps syncing.
+   */
+  NOTION_WRITE_ENABLED: boolFlag("true"),
+  /** When false, Notion pull/push/sync does not run (no Notion network). */
+  NOTION_SYNC_ENABLED: boolFlag("true"),
   /** Directory for the canonical local card export when Notion cards DB is unset (§10). */
   CARDS_EXPORT_DIR: z.string().default("./data/cards-export"),
   /** Batched card-sync flush interval in ms (§8). 0 disables the timer. */
@@ -46,6 +78,11 @@ const envSchema = z.object({
   OPENROUTER_BASE_URL: z.string().default("https://openrouter.ai/api/v1"),
   OPENROUTER_SITE_URL: z.string().default("http://localhost:5173"),
   OPENROUTER_SITE_NAME: z.string().default("DSA Mastery OS"),
+  /** `openrouter` calls the network. `mock` and `disabled` never do. */
+  LLM_PROVIDER: z.preprocess(
+    emptyToUndefined,
+    z.enum(["openrouter", "mock", "disabled"]).default("openrouter"),
+  ),
   WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
   WHATSAPP_ACCESS_TOKEN: z.string().optional(),
   WHATSAPP_VERIFY_TOKEN: z.string().optional(),
@@ -58,7 +95,11 @@ const envSchema = z.object({
   WHATSAPP_NOTIFY_SECRET: z.string().optional(),
   /** Meta app secret — enables X-Hub-Signature-256 verification on webhook POSTs */
   WHATSAPP_APP_SECRET: z.string().optional(),
+  /** When false, WhatsApp `sendText` is a logged no-op. */
+  WHATSAPP_ENABLED: boolFlag("true"),
   SQLITE_PATH: z.string().default("./data/sqlite/dsa.db"),
+  /** Overrides `SQLITE_PATH` when set. Worktree uses `./data/dev/dsa.dev.db`. */
+  DSA_DB_PATH: z.preprocess(emptyToUndefined, z.string().optional()),
   /** Absolute or repo-relative path to the DSA folder of an Obsidian vault */
   OBSIDIAN_VAULT_PATH: z.string().optional(),
   BACKUP_DIR: z.string().default("./data/backups"),
@@ -86,6 +127,11 @@ const envSchema = z.object({
   RESOLVE_LEECH_LAPSES: z.coerce.number().default(4),
   RESOLVE_ESCALATE_DAYS: z.coerce.number().default(14),
   LEETCODE_USERNAME: z.string().optional(),
+  /** Optional Redis URL. The app has no Redis client today; stored so a later
+   *  client cannot silently share a live instance. */
+  REDIS_URL: z.preprocess(emptyToUndefined, z.string().optional()),
+  /** Key prefix for any future Redis usage. Live default is empty. */
+  REDIS_PREFIX: z.string().default(""),
 });
 
 /** A coach LLM the user can pick from in the UI. */
@@ -116,12 +162,18 @@ export type AppConfig = {
     problemsDbId?: string;
     sessionsDbId?: string;
     cardsDbId?: string;
+    /** False → adapter writes are logged no-ops (`NOTION_WRITE_ENABLED`). */
+    writeEnabled: boolean;
+    /** False → no Notion pull, push, or sync (`NOTION_SYNC_ENABLED`). */
+    syncEnabled: boolean;
   };
   cards: {
     exportDir: string;
     flushIntervalMs: number;
   };
   llm: {
+    /** `mock` and `disabled` never open a network connection. */
+    provider: "openrouter" | "mock" | "disabled";
     model: string;
     openrouter: {
       apiKey?: string;
@@ -144,6 +196,8 @@ export type AppConfig = {
     fallbackModels: string[];
   };
   whatsapp: {
+    /** False → sends are logged no-ops (`WHATSAPP_ENABLED`). */
+    enabled: boolean;
     phoneNumberId?: string;
     accessToken?: string;
     verifyToken?: string;
@@ -154,6 +208,10 @@ export type AppConfig = {
     appSecret?: string;
   };
   sqlite: { path: string };
+  /** Vite port. The API process does not listen here. */
+  frontendPort: number;
+  /** No Redis client is constructed. Present so isolation env is explicit. */
+  redis: { url?: string; prefix: string };
   obsidian: { vaultPath?: string };
   backup: { dir: string; keep: number };
   intelligenceWeights: {
@@ -194,9 +252,9 @@ export function loadConfig(envPath?: string): AppConfig {
   loadDotenv({ path: dotenvPath });
   const env = envSchema.parse(process.env);
 
-  const sqlitePath = isAbsolute(env.SQLITE_PATH)
-    ? env.SQLITE_PATH
-    : resolve(repoRoot, env.SQLITE_PATH);
+  const dbPathRaw = env.DSA_DB_PATH ?? env.SQLITE_PATH;
+  const sqlitePath = isAbsolute(dbPathRaw) ? dbPathRaw : resolve(repoRoot, dbPathRaw);
+  const backendPort = env.BACKEND_PORT ?? env.PORT;
 
   const frontendDist = resolve(repoRoot, "packages/frontend/dist");
   const serveFrontend =
@@ -206,7 +264,7 @@ export function loadConfig(envPath?: string): AppConfig {
 
   cached = {
     nodeEnv: env.NODE_ENV,
-    port: env.PORT,
+    port: backendPort,
     logLevel: env.LOG_LEVEL,
     web: { serveFrontend, frontendDist },
     notion: {
@@ -215,6 +273,8 @@ export function loadConfig(envPath?: string): AppConfig {
       problemsDbId: env.NOTION_PROBLEMS_DB_ID,
       sessionsDbId: env.NOTION_SESSIONS_DB_ID,
       cardsDbId: env.NOTION_CARDS_DB_ID,
+      writeEnabled: env.NOTION_WRITE_ENABLED,
+      syncEnabled: env.NOTION_SYNC_ENABLED,
     },
     cards: {
       exportDir: isAbsolute(env.CARDS_EXPORT_DIR)
@@ -223,6 +283,7 @@ export function loadConfig(envPath?: string): AppConfig {
       flushIntervalMs: env.CARDS_SYNC_FLUSH_INTERVAL_MS,
     },
     llm: {
+      provider: env.LLM_PROVIDER,
       model: env.OPENROUTER_MODEL,
       openrouter: {
         apiKey: env.OPENROUTER_API_KEY,
@@ -233,6 +294,7 @@ export function loadConfig(envPath?: string): AppConfig {
     },
     coachLlm: resolveCoachLlm(env),
     whatsapp: {
+      enabled: env.WHATSAPP_ENABLED,
       phoneNumberId: env.WHATSAPP_PHONE_NUMBER_ID,
       accessToken: env.WHATSAPP_ACCESS_TOKEN,
       verifyToken: env.WHATSAPP_VERIFY_TOKEN,
@@ -245,6 +307,11 @@ export function loadConfig(envPath?: string): AppConfig {
       appSecret: env.WHATSAPP_APP_SECRET,
     },
     sqlite: { path: sqlitePath },
+    frontendPort: env.FRONTEND_PORT,
+    redis: {
+      url: env.REDIS_URL,
+      prefix: env.REDIS_PREFIX,
+    },
     obsidian: {
       vaultPath: env.OBSIDIAN_VAULT_PATH
         ? isAbsolute(env.OBSIDIAN_VAULT_PATH)

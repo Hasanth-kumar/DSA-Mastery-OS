@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   NotionSyncTarget,
   NOTION_RATE_LIMIT,
@@ -126,6 +126,24 @@ describe("NotionSyncTarget (§8, §10, §13)", () => {
     expect(calls.schemaProps).toContain("Concept Tags");
     expect(calls.schemaProps).not.toContain("UUID"); // already present
     expect(calls.schemaProps).not.toContain("Front"); // title is never added
+  });
+
+  it("skips card pushes when writes are disabled", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { client, calls } = stubClient();
+    const target = new NotionSyncTarget({ ...CONFIG, client, writeEnabled: false });
+    const res = await target.pushCards([card("a"), card("b", { notionPageId: "page-b" })]);
+    expect(res).toEqual({
+      pushed: 0,
+      failed: 2,
+      failedIds: ["a", "b"],
+      pageIds: {},
+    });
+    expect(calls.created).toEqual([]);
+    expect(calls.updated).toEqual([]);
+    expect(calls.schemaProps).toEqual([]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("NOTION_WRITE_ENABLED=false"));
+    warn.mockRestore();
   });
 
   it("returns zero counts when not configured (graceful, §1/§10)", async () => {

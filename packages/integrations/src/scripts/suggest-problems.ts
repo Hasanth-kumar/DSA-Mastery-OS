@@ -16,12 +16,10 @@ import type Database from "better-sqlite3";
 import { loadConfig } from "@dsa/shared";
 import { createSqliteDb, runMigrations } from "../sqlite/client.js";
 import { createLeetCodeClient } from "../leetcode/LeetCodeClient.js";
-import { createOpenRouterClient } from "../llm/OpenRouterClient.js";
 import { createNotionClient } from "../notion/NotionClient.js";
 import {
   buildSuggestionPrompt,
-  createGenerationClient,
-  createOllamaGenerationClient,
+  createBatchGenerationClient,
   parseProblemSuggestions,
   DEFAULT_OLLAMA_GEN_MODEL,
   type ProblemSuggestionDraft,
@@ -60,17 +58,16 @@ async function suggest(): Promise<void> {
     }
     console.log(`${orphans.length} orphan topic(s): ${orphans.map((t) => t.name).join(", ")}`);
 
-    const llm = createGenerationClient({
-      local: createOllamaGenerationClient({
-        model: process.env.OLLAMA_GEN_MODEL ?? DEFAULT_OLLAMA_GEN_MODEL,
-      }),
-      cloud: createOpenRouterClient({
+    const llm = createBatchGenerationClient({
+      provider: cfg.llm.provider,
+      localModel: process.env.OLLAMA_GEN_MODEL ?? DEFAULT_OLLAMA_GEN_MODEL,
+      cloud: {
         apiKey: cfg.llm.openrouter.apiKey ?? "",
         model: cfg.llm.model,
         baseUrl: cfg.llm.openrouter.baseUrl,
         siteUrl: cfg.llm.openrouter.siteUrl,
         siteName: cfg.llm.openrouter.siteName,
-      }),
+      },
     });
     const leetcode = createLeetCodeClient({ username: cfg.leetcode?.username ?? "" });
 
@@ -120,6 +117,10 @@ async function suggest(): Promise<void> {
 
 async function approve(): Promise<void> {
   const cfg = loadConfig(resolve(repoRoot, ".env"));
+  if (!cfg.notion.writeEnabled) {
+    console.warn("[notion] approve skipped: NOTION_WRITE_ENABLED=false");
+    return;
+  }
   const results = JSON.parse(readFileSync(REVIEW_JSON, "utf-8")) as TopicSuggestions[];
   const notion = createNotionClient(cfg.notion);
 

@@ -20,16 +20,18 @@ export class WhatsAppNotificationService {
     private readonly config: AppConfig,
     private readonly ctx: AppContext,
   ) {
-    const { phoneNumberId, accessToken, apiVersion } = config.whatsapp;
+    const { phoneNumberId, accessToken, apiVersion, enabled } = config.whatsapp;
     this.client =
       phoneNumberId && accessToken
-        ? createWhatsAppClient({ phoneNumberId, accessToken, apiVersion })
+        ? createWhatsAppClient({ phoneNumberId, accessToken, apiVersion, enabled })
         : null;
   }
 
   isConfigured(): boolean {
     return Boolean(
-      this.client?.isConfigured() && this.config.whatsapp.defaultRecipient,
+      this.config.whatsapp.enabled !== false &&
+        this.client?.isConfigured() &&
+        this.config.whatsapp.defaultRecipient,
     );
   }
 

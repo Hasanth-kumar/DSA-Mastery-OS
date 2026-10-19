@@ -70,4 +70,77 @@ describe("loadConfig", () => {
     delete process.env.COACH_LLM_FALLBACK_MODELS;
     resetConfigCache();
   });
+
+  it("routes isolation env vars and lets DSA_DB_PATH override SQLITE_PATH", () => {
+    process.env.DSA_DB_PATH = "./data/dev/dsa.dev.db";
+    process.env.SQLITE_PATH = "./data/sqlite/dsa.db";
+    process.env.NOTION_WRITE_ENABLED = "false";
+    process.env.NOTION_SYNC_ENABLED = "false";
+    process.env.WHATSAPP_ENABLED = "false";
+    process.env.LLM_PROVIDER = "mock";
+    process.env.BACKEND_PORT = "3100";
+    process.env.PORT = "3000";
+    process.env.FRONTEND_PORT = "5273";
+    process.env.REDIS_PREFIX = "overhaul:";
+    process.env.OBSIDIAN_VAULT_PATH = "./data/dev/vault";
+    resetConfigCache();
+
+    try {
+      const cfg = loadConfig("/nonexistent/.env");
+      expect(cfg.sqlite.path).toMatch(/data\/dev\/dsa\.dev\.db$/);
+      expect(cfg.notion.writeEnabled).toBe(false);
+      expect(cfg.notion.syncEnabled).toBe(false);
+      expect(cfg.whatsapp.enabled).toBe(false);
+      expect(cfg.llm.provider).toBe("mock");
+      expect(cfg.port).toBe(3100);
+      expect(cfg.frontendPort).toBe(5273);
+      expect(cfg.redis.prefix).toBe("overhaul:");
+      expect(cfg.obsidian.vaultPath).toMatch(/data\/dev\/vault$/);
+    } finally {
+      for (const key of [
+        "DSA_DB_PATH",
+        "SQLITE_PATH",
+        "NOTION_WRITE_ENABLED",
+        "NOTION_SYNC_ENABLED",
+        "WHATSAPP_ENABLED",
+        "LLM_PROVIDER",
+        "BACKEND_PORT",
+        "PORT",
+        "FRONTEND_PORT",
+        "REDIS_PREFIX",
+        "OBSIDIAN_VAULT_PATH",
+      ]) {
+        delete process.env[key];
+      }
+      resetConfigCache();
+    }
+  });
+
+  it("keeps live defaults when isolation flags are unset", () => {
+    delete process.env.DSA_DB_PATH;
+    delete process.env.NOTION_WRITE_ENABLED;
+    delete process.env.NOTION_SYNC_ENABLED;
+    delete process.env.WHATSAPP_ENABLED;
+    delete process.env.LLM_PROVIDER;
+    delete process.env.BACKEND_PORT;
+    delete process.env.FRONTEND_PORT;
+    process.env.SQLITE_PATH = "./data/sqlite/dsa.db";
+    process.env.PORT = "3000";
+    resetConfigCache();
+
+    try {
+      const cfg = loadConfig("/nonexistent/.env");
+      expect(cfg.sqlite.path).toMatch(/data\/sqlite\/dsa\.db$/);
+      expect(cfg.notion.writeEnabled).toBe(true);
+      expect(cfg.notion.syncEnabled).toBe(true);
+      expect(cfg.whatsapp.enabled).toBe(true);
+      expect(cfg.llm.provider).toBe("openrouter");
+      expect(cfg.port).toBe(3000);
+      expect(cfg.frontendPort).toBe(5173);
+    } finally {
+      delete process.env.SQLITE_PATH;
+      delete process.env.PORT;
+      resetConfigCache();
+    }
+  });
 });

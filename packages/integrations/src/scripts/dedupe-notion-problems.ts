@@ -23,6 +23,10 @@ const apply = process.argv.includes("--apply");
 
 async function main() {
   const cfg = loadConfig(resolve(repoRoot, ".env"));
+  if (!cfg.notion.syncEnabled) {
+    console.warn("[notion] dedupe skipped: NOTION_SYNC_ENABLED=false");
+    return;
+  }
   const notion = createNotionClient(cfg.notion);
   const rawPages = await notion.queryDatabase(cfg.notion.problemsDbId!);
   const pages = filterFullProblemPages(rawPages);
