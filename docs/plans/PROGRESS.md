@@ -3,7 +3,7 @@
 ## Status board
 | Task | Status | Commit | Notes |
 |---|---|---|---|
-| P0.1 | done | | isolation env vars + Notion/WhatsApp write guards |
+| P0.1 | done | 01fb24f | isolation env vars + Notion/WhatsApp write guards |
 | P0.2 | todo | | |
 | P0.3 | todo | | |
 | P1.1 | todo | | |
