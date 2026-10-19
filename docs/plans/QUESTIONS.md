@@ -8,6 +8,6 @@
 - [D7] Approve the topic tiers in `topic-tiers.md` — default proposal in P7.1. Asked 2026-10-19. Runs waiting: 0
 - [D8] Max re-solves on Today per day — default 1. Asked 2026-10-19. Runs waiting: 0
 - [D9] Allow Notion reads in the worktree — default no; use dev DB only. Asked 2026-10-19. Runs waiting: 0
-- [D10] This scheduled run is on `cursor/system-overhaul-continuation-4714` at `e4957d6`, the same commit as `origin/overhaul`, not branch `overhaul`. `git pull --ff-only origin overhaul` was already up to date. Protocol §2 step 1 says stop, so no task ran and the safety check did not run. Should a cloud run that is fast-forward with `origin/overhaul` but not checked out as `overhaul` switch to `overhaul` and continue, or keep stopping until the checkout is named `overhaul`? No default. Asked 2026-10-19. Runs waiting: 0
 ## Answered
+- [D10] → Yes. A cloud run that is fast-forward with `origin/overhaul` but not checked out as `overhaul` should switch to `overhaul` and continue. Answered 2026-10-19.
 - [D1] → WIP branch. Setup on 2026-10-19 branched `overhaul` from `wip/focus-planner`, which points at `feat/session-outcome-focus` (`bb8cfb6`) plus the plan docs.
