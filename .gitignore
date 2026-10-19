@@ -42,3 +42,6 @@ packages/*/data/sqlite/*.sqlite-*
 # Local agent context (owner machine only — never commit)
 .cursor/local/
 .cursor/rules/local-*.mdc
+
+# Overhaul worktree database, snapshots, and vault fixture (never commit)
+data/dev/
