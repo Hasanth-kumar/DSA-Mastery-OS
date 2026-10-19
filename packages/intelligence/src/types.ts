@@ -3,6 +3,12 @@
 export type TopicDifficulty = "Easy" | "Medium" | "Hard";
 export type TopicStatus = "Not started" | "In progress" | "Mastered";
 
+/**
+ * Where the learner is with a topic. First exposure to a pattern is expected to
+ * be messy (wrong approach, hints) — that is "learning", not "weak".
+ */
+export type TopicStage = "learning" | "practicing" | "retaining";
+
 export interface TopicState {
   id: string;
   name: string;
@@ -130,6 +136,48 @@ export interface StudyPlan {
   resolveTotalDue?: number;
   /** Re-solves pushed forward by capacity compression on this plan. */
   resolveDeferred?: number;
+  /** The one-screen "do this now" plan (time-boxed, gap-aware). */
+  focus?: FocusPlan;
+}
+
+/** What kind of day this is: a normal session, a gentle restart after a gap, or already done. */
+export type FocusMode = "normal" | "reentry" | "done";
+
+/** One time-boxed step of the focus plan. */
+export interface FocusBlock {
+  kind: "resolve" | "learn" | "log";
+  title: string;
+  minutes: number;
+  /** What to actually do in this block — one sentence. */
+  instruction: string;
+  problemId?: string;
+  leetcodeLink?: string | null;
+  difficulty?: TopicDifficulty | null;
+  topicName?: string;
+}
+
+/** Weekly quota progress — a weekly target replaces a fragile daily streak. */
+export interface FocusWeek {
+  target: number;
+  done: number;
+  remaining: number;
+  /** Days left this week including today (if today is not done yet). */
+  daysLeft: number;
+  /** True when the remaining sessions still fit in the remaining days. */
+  onTrack: boolean;
+}
+
+export interface FocusPlan {
+  mode: FocusMode;
+  headline: string;
+  reason: string;
+  totalMinutes: number;
+  blocks: FocusBlock[];
+  week: FocusWeek;
+  /** Days since the last logged session; null when there is no history. */
+  gapDays: number | null;
+  /** Pre-submit checklist for the learner's most repeated mistake (cross-topic). */
+  tip: { tag: string; count: number; checklist: string[] } | null;
 }
 
 /** One committed re-solve on today's plan (re-solve design §6, §10). */
@@ -148,6 +196,8 @@ export interface ResolvePlanSlot {
 export interface PlanOptions {
   maxRevisionTopics?: number;
   availableMinutes?: number;
+  /** Sessions per week the learner is aiming for (focus plan). Default 5. */
+  weeklyTarget?: number;
 }
 
 export interface PriorityWeights {
@@ -176,6 +226,8 @@ export interface WeaknessAnalysis {
   topicId: string;
   score: number;
   isWeak: boolean;
+  /** Learning stage the verdict was made at (a topic in "learning" is never flagged weak). */
+  stage?: TopicStage;
   signals: WeaknessSignal[];
   recommendation: string;
 }

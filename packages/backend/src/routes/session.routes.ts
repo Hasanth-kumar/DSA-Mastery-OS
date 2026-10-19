@@ -141,6 +141,9 @@ export async function sessionRoutes(
       attempt.problemId,
       parseMistakeTags(attempt.mistakeTag),
     );
+    // The outcome (tags + "needed help") is now known: re-score the session.
+    await ctx.sessionService.rescoreAfterMistakeCapture(attempt);
+    ctx.events.publish("session");
     ctx.events.publish("attempt");
     ctx.events.publish("problem");
     return reply.send(serializeForJson({ attempt }));

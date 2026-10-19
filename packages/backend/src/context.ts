@@ -129,6 +129,8 @@ export function createAppContext(
     cache,
     curriculumService,
     problemReviewService,
+    sessionRepo,
+    config.schedulers.timezone,
   );
   const coachUsage = new Map<string, number>();
   const sessionService = new SessionService(

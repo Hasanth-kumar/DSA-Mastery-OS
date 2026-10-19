@@ -17,6 +17,11 @@ export type {
   CurriculumItem,
   CurriculumProgress,
   MistakeTag,
+  TopicStage,
+  FocusBlock,
+  FocusMode,
+  FocusPlan,
+  FocusWeek,
 } from "./types.js";
 
 export { MISTAKE_TAG_LABELS } from "./types.js";
@@ -34,6 +39,16 @@ export {
   deriveTopicStatusAfterSession,
 } from "./topic-progression.js";
 export { deriveProductivityFromDuration } from "./session-productivity.js";
+export {
+  confidenceDeltaForScore,
+  deriveSessionOutcomeScore,
+  TARGET_MINUTES,
+  type SessionOutcomeInput,
+} from "./session-outcome.js";
+export { deriveTopicStage, LEARNING_MIN_ATTEMPTS } from "./topic-stage.js";
+export { maxIntervalDaysForConfidence } from "./revision-engine/sm2.js";
+export { planScheduleRepair, type ScheduleRepairItem } from "./revision-engine/schedule-repair.js";
+export { buildFocusPlan, type FocusInput } from "./focus-engine/FocusPlanner.js";
 export { buildTopicGraphEdges } from "./roadmap-engine/graph-edges.js";
 export {
   createIntelligenceOrchestrator,

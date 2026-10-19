@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "../api/client.js";
 import { CheckCircleIcon, EmptyState } from "../components/EmptyState.js";
+import { FocusCard } from "../components/FocusCard.js";
 import { MasteryRing } from "../components/MasteryRing.js";
 import { MistakeCapture } from "../components/MistakeCapture.js";
 import { PageHeader } from "../components/PageHeader.js";
@@ -395,6 +396,8 @@ export function TodayPage({ onOpenCoach }: Props) {
               steps={revisionFlow ? SESSION_STEPS_REVISE : SESSION_STEPS}
             />
           )}
+
+          {plan.focus && <FocusCard focus={plan.focus} />}
 
           <div className="focus-hero-wrap">
             <section className="focus-hero">

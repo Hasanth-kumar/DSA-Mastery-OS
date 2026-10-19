@@ -18,6 +18,7 @@
     "db:generate-cards": "pnpm --filter @dsa/integrations db:generate-cards",
     "db:suggest-problems": "pnpm --filter @dsa/integrations db:suggest-problems",
     "db:dedupe-problems": "pnpm --filter @dsa/integrations db:dedupe-problems",
+    "db:repair-schedules": "pnpm --filter @dsa/backend db:repair-schedules",
     "prestart": "pnpm build",
     "start": "NODE_ENV=production SERVE_FRONTEND=true node packages/backend/dist/server.js",
     "study": "bash infrastructure/scripts/study.sh",

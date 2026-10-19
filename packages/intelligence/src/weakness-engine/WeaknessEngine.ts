@@ -11,6 +11,7 @@ import {
   timeSignal,
   WEAKNESS_THRESHOLD,
 } from "./signals.js";
+import { deriveTopicStage } from "../topic-stage.js";
 
 export class WeaknessEngine {
   analyzeWeakness(topic: TopicState): WeaknessAnalysis {
@@ -26,14 +27,21 @@ export class WeaknessEngine {
     ];
 
     const score = signals.reduce((acc, s) => acc + s.weight * s.value, 0);
-    const isWeak = score > WEAKNESS_THRESHOLD;
+    // First exposure to a pattern is messy by nature: misses and hints there are
+    // learning, not weakness. Only judge a topic once it is past that stage.
+    const stage = deriveTopicStage(topic);
+    const isWeak = stage !== "learning" && score > WEAKNESS_THRESHOLD;
 
     return {
       topicId: topic.id,
       score,
       isWeak,
+      stage,
       signals: signals.filter((s) => s.value > 0),
-      recommendation: this.buildRecommendation(signals, isWeak, topic),
+      recommendation:
+        stage === "learning"
+          ? this.learningRecommendation(topic)
+          : this.buildRecommendation(signals, isWeak, topic),
     };
   }
 
@@ -47,6 +55,10 @@ export class WeaknessEngine {
       strongTopics,
       summary: this.summarize(analyses, weakTopics.length),
     };
+  }
+
+  private learningRecommendation(topic: TopicState): string {
+    return `Still learning ${topic.name} — misses are expected. Aim for one solve with no outside help on an Easy problem, then add Mediums.`;
   }
 
   private buildRecommendation(

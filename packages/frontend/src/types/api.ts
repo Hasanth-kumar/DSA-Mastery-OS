@@ -85,8 +85,34 @@ export interface CurriculumState {
   } | null;
 }
 
+export type FocusMode = "normal" | "reentry" | "done";
+
+export interface FocusBlock {
+  kind: "resolve" | "learn" | "log";
+  title: string;
+  minutes: number;
+  instruction: string;
+  problemId?: string;
+  leetcodeLink?: string;
+  difficulty?: TopicDifficulty;
+  topicName?: string;
+}
+
+export interface FocusPlan {
+  mode: FocusMode;
+  headline: string;
+  reason: string;
+  totalMinutes: number;
+  blocks: FocusBlock[];
+  week: { target: number; done: number; remaining: number; daysLeft: number; onTrack: boolean };
+  gapDays: number;
+  tip: { tag: string; count: number; checklist: string[] } | null;
+}
+
 export interface StudyPlan {
   date: string;
+  /** Time-boxed daily plan; absent on cached plans from before this field existed. */
+  focus?: FocusPlan;
   primaryTopic: Topic;
   revisionTopics: Topic[];
   /** Optional: cached plans from before this field existed won't have it. */

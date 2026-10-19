@@ -1,4 +1,5 @@
 import type { TopicState, WeaknessSignal } from "../types.js";
+import { latestSessions } from "../utils/sessions.js";
 
 const SIGNAL_WEIGHTS = {
   confidence: 0.25,
@@ -90,7 +91,7 @@ export function sessionProductivitySignal(topic: TopicState): WeaknessSignal {
 }
 
 export function revisionFailureSignal(topic: TopicState): WeaknessSignal {
-  const recent = topic.recentSessions.slice(-3);
+  const recent = latestSessions(topic.recentSessions, 3);
   const failures = recent.filter((s) => s.productivityScore < 60).length;
   const value =
     failures >= 2 ? 1 : failures === 1 ? 0.5 : topic.revisionCount > 0 && topic.confidence < 50 ? 0.5 : 0;

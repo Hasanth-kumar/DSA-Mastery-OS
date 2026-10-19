@@ -76,6 +76,17 @@ export class AttemptRepository {
     );
   }
 
+  /** The attempt a logged session produced (one problem per session). */
+  findBySessionId(sessionId: string): AttemptRow | null {
+    return (
+      this.db
+        .select()
+        .from(problemAttempts)
+        .where(eq(problemAttempts.sessionId, sessionId))
+        .get() ?? null
+    );
+  }
+
   findByProblemId(problemId: string, limit = 10): AttemptRow[] {
     return this.db
       .select()

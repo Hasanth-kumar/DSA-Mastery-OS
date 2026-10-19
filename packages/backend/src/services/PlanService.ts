@@ -6,9 +6,11 @@ import type {
   StudyPlan,
   TopicState,
 } from "@dsa/intelligence";
-import { computePriorityScore } from "@dsa/intelligence";
+import { buildFocusPlan, computePriorityScore } from "@dsa/intelligence";
 import type { ProblemRepository } from "../repositories/ProblemRepository.js";
+import type { SessionRepository } from "../repositories/SessionRepository.js";
 import type { TopicRepository } from "../repositories/TopicRepository.js";
+import { dayKeyInTimeZone, learnerTimeZone } from "../lib/dayKey.js";
 import { formatDateKey } from "../lib/json.js";
 import type { CacheService } from "./CacheService.js";
 import type { CurriculumService } from "./CurriculumService.js";
@@ -25,6 +27,9 @@ export class PlanService {
     private readonly cache: CacheService,
     private readonly curriculumService: CurriculumService,
     private readonly problemReviews?: ProblemReviewService,
+    /** Session history for the focus plan's weekly target and gap detection. */
+    private readonly sessionRepo?: SessionRepository,
+    private readonly configuredTimeZone?: string,
   ) {
     this.problemSuggestions = new ProblemSuggestionService(problemRepo);
   }
@@ -140,6 +145,8 @@ export class PlanService {
       reasoning += ` Re-solve promoted: ${slot.name} is ${slot.daysOverdue} days overdue.`;
     }
 
+    const focus = this.buildFocus(topics, primaryTopic, suggestedProblems, resolveSlots, options);
+
     return {
       date: new Date(),
       primaryTopic,
@@ -156,7 +163,45 @@ export class PlanService {
       resolveSlots,
       resolveTotalDue,
       resolveDeferred,
+      focus,
     };
+  }
+
+  /** The one-screen "do this now" plan: due re-solves, then new material, sized to the day. */
+  private buildFocus(
+    topics: TopicState[],
+    primaryTopic: TopicState,
+    suggestedProblems: StudyPlan["suggestedProblems"],
+    resolveSlots: ResolvePlanSlot[],
+    options: PlanOptions,
+  ): StudyPlan["focus"] {
+    const timeZone = learnerTimeZone(this.configuredTimeZone);
+    const activeDayKeys = [
+      ...new Set(
+        (this.sessionRepo?.findAll(400) ?? []).map((s) => dayKeyInTimeZone(s.date, timeZone)),
+      ),
+    ];
+
+    // Most repeated mistake across ALL topics — off-by-one hurts everywhere.
+    const totals = new Map<string, number>();
+    for (const t of topics) {
+      for (const [tag, n] of Object.entries(t.mistakeTagCounts ?? {})) {
+        if (tag === "could-not-solve") continue;
+        totals.set(tag, (totals.get(tag) ?? 0) + n);
+      }
+    }
+    const top = [...totals.entries()].sort((a, b) => b[1] - a[1])[0];
+
+    return buildFocusPlan({
+      todayKey: dayKeyInTimeZone(Date.now(), timeZone),
+      activeDayKeys,
+      dueResolves: resolveSlots,
+      newProblems: suggestedProblems,
+      primaryTopicName: primaryTopic.name,
+      topMistake: top ? { tag: top[0], count: top[1] } : null,
+      minutes: options.availableMinutes,
+      weeklyTarget: options.weeklyTarget,
+    });
   }
 
   /**

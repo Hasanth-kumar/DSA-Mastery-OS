@@ -4,6 +4,7 @@ import type {
   TopicDifficulty,
   TopicState,
 } from "../types.js";
+import { latestSessions } from "../utils/sessions.js";
 
 export class DifficultyEngine {
   recommendDifficulty(topic: TopicState): DifficultyRecommendation {
@@ -58,7 +59,7 @@ export class DifficultyEngine {
     sessions: SessionSnapshot[],
     n: number,
   ): number {
-    const recent = sessions.slice(-n);
+    const recent = latestSessions(sessions, n);
     if (recent.length === 0) return 50;
     return recent.reduce((acc, s) => acc + s.productivityScore, 0) / recent.length;
   }

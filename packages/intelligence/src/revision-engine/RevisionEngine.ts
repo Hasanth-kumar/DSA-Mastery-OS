@@ -1,7 +1,12 @@
 import type { SessionSnapshot, TopicState } from "../types.js";
 import { addDays, differenceInDays, isBefore } from "../utils/dates.js";
 import type { SM2State } from "../types.js";
-import { readSM2State, sm2Update, topicToSM2Quality } from "./sm2.js";
+import {
+  maxIntervalDaysForConfidence,
+  readSM2State,
+  sm2Update,
+  topicToSM2Quality,
+} from "./sm2.js";
 
 export class RevisionEngine {
   isDue(topic: TopicState, now: Date = new Date()): boolean {
@@ -61,6 +66,11 @@ export class RevisionEngine {
 
   /** Apply an explicit SM-2 quality (0–5), e.g. from a recall warm-up self-grade. */
   applyQuality(topic: TopicState, quality: number, now: Date = new Date()): SM2State {
-    return sm2Update(readSM2State(topic, now), quality, now);
+    return sm2Update(
+      readSM2State(topic, now),
+      quality,
+      now,
+      maxIntervalDaysForConfidence(topic.confidence),
+    );
   }
 }
