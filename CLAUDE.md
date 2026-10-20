@@ -33,6 +33,9 @@ pnpm build            # build all packages (see ordering note below)
 pnpm test             # all Vitest suites
 pnpm lint             # ESLint across packages
 
+pnpm dev:snapshot     # copy data/dev/dsa.dev.db to data/dev/snapshots/<timestamp>.db
+pnpm dev:reset        # restore data/dev/dsa.dev.db from the pristine baseline
+
 pnpm db:seed          # Notion -> SQLite initial sync (topics/problems/sessions)
 pnpm db:seed-cards    # load seed flashcards from database/seeds
 pnpm db:embed-cards   # compute local embedding vectors
