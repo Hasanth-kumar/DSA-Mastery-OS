@@ -45,3 +45,6 @@ packages/*/data/sqlite/*.sqlite-*
 
 # Overhaul worktree database, snapshots, and vault fixture (never commit)
 data/dev/
+
+# Personal numbers from `pnpm dev:metrics` (never commit)
+docs/plans/baseline-metrics.md

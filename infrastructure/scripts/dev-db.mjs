@@ -98,7 +98,7 @@ function fail(message) {
   return error;
 }
 
-function assertInsideDevDir(repoRoot, target) {
+export function assertInsideDevDir(repoRoot, target) {
   const devDir = resolve(repoRoot, "data/dev");
   const abs = resolve(target);
   const rel = relative(devDir, abs);

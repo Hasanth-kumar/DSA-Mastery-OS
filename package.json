@@ -28,7 +28,8 @@
     "docker:down": "docker compose -f infrastructure/docker-compose.yml down",
     "setup": "bash infrastructure/scripts/setup.sh",
     "dev:snapshot": "node infrastructure/scripts/dev-db.mjs snapshot",
-    "dev:reset": "node infrastructure/scripts/dev-db.mjs reset"
+    "dev:reset": "node infrastructure/scripts/dev-db.mjs reset",
+    "dev:metrics": "node --disable-warning=ExperimentalWarning infrastructure/scripts/dev-metrics.mjs"
   },
   "engines": {
     "node": ">=20"
