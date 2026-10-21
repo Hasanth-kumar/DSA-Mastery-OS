@@ -5,7 +5,7 @@
 |---|---|---|---|
 | P0.1 | done | 01fb24f | isolation env vars + Notion/WhatsApp write guards |
 | P0.2 | done | 54b560f | snapshot and reset scripts; refuse live paths |
-| P0.3 | todo | | |
+| P0.3 | done | 9968459 | script only; baseline-metrics.md is local-only (no dev db) and gitignored |
 | P1.1 | todo | | |
 | P1.2 | todo | | |
 | P1.3 | todo | | |
@@ -38,6 +38,13 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-21 — P0.3 Baseline metrics script
+- Did: Added `pnpm dev:metrics` (`infrastructure/scripts/dev-metrics.mjs`). It prints sessions, total minutes (`sessions.study_duration`), attempts, problems by status, per-topic confidence and `topics.next_revision_at` / `sm2_interval` (the plan's `next_review` name), `problem_reviews` count and due count, `cards` and `card_events` counts, last `chat_messages` date, coach-used attempts (`used_coach > 0`), the mistake-tag distribution, and `sync_meta.curriculum_active_topic_id`. The script ignores `SQLITE_PATH`, refuses paths outside `data/dev` and symlinks, and refuses a path argument. A missing file is an error and is not created. The dev file is not opened in place: SQLite would create `-wal`/`-shm` beside it and would miss uncheckpointed WAL pages, so the script copies the db and any sidecars to a temp directory, reads the copy, and deletes it. Row text (problem names, chat bodies, other `.env` keys) is not printed. `docs/plans/baseline-metrics.md` is gitignored and was not written.
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). New coverage: 10 tests in `packages/shared/src/dev-metrics-script.test.ts`.
+- Data check: code-only mode — no `.env`, no credentials, no `data/dev/dsa.dev.db`. Did not create a dev database. Did not save `docs/plans/baseline-metrics.md` (P0.3 output is local-only until a dev database exists). Tests used temp fixture files.
+- Surprises / plan corrections: the SM-2 next-review column is `topics.next_revision_at`, not `next_review`. The report names that alias. Due reviews are `retired = 0 AND suspended = 0 AND due IS NOT NULL AND due <= now`.
+- Next suggested task: P1.1. In code-only mode, do the code verification and mark the dev-database queries local-only.
+
 ### 2026-10-20 — P0.2 Dev-DB snapshot and reset scripts
 - Did: Added `pnpm dev:snapshot` and `pnpm dev:reset` (`infrastructure/scripts/dev-db.mjs`). Snapshot copies `data/dev/dsa.dev.db` (or `DSA_DB_PATH` from the environment or `.env`) to `data/dev/snapshots/<UTC timestamp>.db`, including `-wal` and `-shm` sidecars. Reset restores `data/dev/dsa.snapshot-2026-10-19.db` (or `DSA_DB_BASELINE`), drops a stale dev wal/shm so it cannot replay onto the restored file, and copies baseline sidecars. Both ignore `SQLITE_PATH`, refuse anything outside `data/dev`, refuse symlinks, and refuse identical source and destination. A missing dev db or baseline exits with an error and does not create a database.
 - Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). New coverage: 7 tests in `packages/shared/src/dev-db-script.test.ts`.
