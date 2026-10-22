@@ -6,7 +6,7 @@
 | P0.1 | done | 01fb24f | isolation env vars + Notion/WhatsApp write guards |
 | P0.2 | done | 54b560f | snapshot and reset scripts; refuse live paths |
 | P0.3 | done | 9968459 | script only; baseline-metrics.md is local-only (no dev db) and gitignored |
-| P1.1 | todo | | |
+| P1.1 | done | 9b234f2 | code verdicts in verification.md; data queries local-only |
 | P1.2 | todo | | |
 | P1.3 | todo | | |
 | P2.1 | todo | | |
@@ -38,6 +38,13 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-22 — P1.1 Verify problems #1, #6, #7, #8 in code and data
+- Did: Wrote `docs/plans/verification.md` from code, with no behavior change. Confirmed the "Revision needed" deadlock: `buildProblemCounts()` counts every non-`Solved` status as unsolved, and `findUnsolvedByTopicId()` returns only `"Not started"`, so suggestions fall through to the "add problems in Notion" placeholder. The default curriculum is 12 labels, each resolving to one topic. Primary-topic selection is `CurriculumEngine` only. Corrected the plan: keep the existing SM-2 caps (7 / 21 / 45 / 120), there is no `RoadmapEngine`, and Medium-as-primary starts at confidence ≥ 60 with recent productivity ≥ 60.
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). No new tests.
+- Data check: code-only mode — no `.env`, no credentials, no `data/dev/dsa.dev.db`. Did not create a database and did not run `pnpm db:repair-schedules` (it would open, and by default create, `./data/sqlite/dsa.db`). Local-only until a dev database exists: whether far-future SM-2 dates are still stored, the `curriculum_active_topic_id` value, the topics-table size versus the 12 labels, and whether any topic is actually stuck on "Revision needed" with no "Not started" problems.
+- Surprises / plan corrections: problem-linked sessions already use `deriveSessionOutcomeScore`, and `RevisionEngine.applyQuality` is the only production caller of `sm2Update` and already passes the confidence cap. A 1-minute session scores 100 under the old length formula (SM-2 quality 5). A helped 1-minute session now scores about 50 (quality 3), which still lengthens the interval up to the cap. `namesMatch` can bind the label "Greedy" to a topic named "Greedy Sorting" without a manual pin. P2.1 is the regression test, not a new 180-day clamp.
+- Next suggested task: P1.2. It is code-only. P1.1's data queries stay local-only.
+
 ### 2026-10-21 — P0.3 Baseline metrics script
 - Did: Added `pnpm dev:metrics` (`infrastructure/scripts/dev-metrics.mjs`). It prints sessions, total minutes (`sessions.study_duration`), attempts, problems by status, per-topic confidence and `topics.next_revision_at` / `sm2_interval` (the plan's `next_review` name), `problem_reviews` count and due count, `cards` and `card_events` counts, last `chat_messages` date, coach-used attempts (`used_coach > 0`), the mistake-tag distribution, and `sync_meta.curriculum_active_topic_id`. The script ignores `SQLITE_PATH`, refuses paths outside `data/dev` and symlinks, and refuses a path argument. A missing file is an error and is not created. The dev file is not opened in place: SQLite would create `-wal`/`-shm` beside it and would miss uncheckpointed WAL pages, so the script copies the db and any sidecars to a temp directory, reads the copy, and deletes it. Row text (problem names, chat bodies, other `.env` keys) is not printed. `docs/plans/baseline-metrics.md` is gitignored and was not written.
 - Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). New coverage: 10 tests in `packages/shared/src/dev-metrics-script.test.ts`.
