@@ -26,6 +26,12 @@ The backend intelligence is sophisticated, but daily use has too much friction:
 
 **Guiding principle:** the app's most important job is to reliably put the right *due re-solve* and the right *next problem* in front of Santosh with zero hunting. Every task should serve that. Do not add features beyond this plan.
 
+**Code corrections from P1.1 (2026-10-22).** Evidence is in `docs/plans/verification.md`. Far-future dates, the stored pin value, and the topics-table size were not queried (no dev database in that session).
+
+- **#1.** Problem-linked sessions already use outcome scoring. `RevisionEngine.applyQuality` already clamps intervals to 7 / 21 / 45 / 120 days by confidence. Do not replace that with a flat 180-day cap (see P2.1). A one-minute helped session still maps to SM-2 quality 3, which still lengthens the interval up to the cap.
+- **#6.** There is no `RoadmapEngine` class. Planning never consults `DSA_PREREQUISITES`. Primary-topic selection is `CurriculumEngine` only. The default list is 12 labels. `computePriorityScore` annotates the chosen topic; it does not choose it.
+- **#8.** Medium as the primary difficulty requires confidence ≥ 60 and recent productivity ≥ 60. Confidence ≥ 40 still offers Medium as the secondary slot. Below 40 is Easy only. Coach assist subtracts 8 or 15 points before those gates.
+
 ---
 
 ## 1. Isolation strategy (decided)
@@ -172,11 +178,11 @@ Sizes: **XS** < 30 min · **S** ≈ 1 session · **M** ≈ 2 sessions (split it)
 ### Phase 2 — Data integrity (#1)
 
 **P2.1 Confirm the scorer fix stops the corruption** · S · depends P1.1
-- Ensure SM-2 updates use the outcome-based score (`session-outcome.ts` from the WIP branch), not session duration. Clamp `sm2_interval` to a sane maximum (default **180 days**) at the engine level as a guard rail, with a test.
-- *Acceptance:* a unit test shows a 1-minute session with heavy hints can no longer produce a large interval.
+- Already on this branch (P1.1): problem-linked sessions call `deriveSessionOutcomeScore`, and `RevisionEngine.applyQuality` passes `maxIntervalDaysForConfidence` (7 / 21 / 45 / 120 days). Keep those caps. A flat 180-day cap would loosen them. `sm2Update` stays uncapped only when a caller omits `maxInterval`; production has one caller and it passes the cap.
+- *Acceptance:* one regression test through the production path shows a 1-minute session with heavy hints on a weak topic stays inside that topic's confidence cap and is not scored as SM-2 quality 5. Do not change the rule that quality ≥ 3 lengthens the interval. That is ordinary SM-2; the far-future bug was quality 5 with no cap.
 
 **P2.2 Run and validate schedule repair on the dev DB** · S · depends P2.1, P0.2
-- Snapshot, then run `pnpm db:repair-schedules` against `dsa.dev.db`. Re-run `dev:metrics`. Every weak topic (confidence < 40) must have `next_review` within 14 days, and none beyond the clamp.
+- Snapshot, then run `pnpm db:repair-schedules` against `dsa.dev.db`. Re-run `dev:metrics`. Every weak topic (confidence < 40) must have `topics.next_revision_at` (the column this plan calls `next_review`) within 14 days, and none beyond the confidence cap from P2.1.
 - If the repair logic is wrong, fix it (with tests) and re-run from the snapshot.
 - *Output:* before/after table in PROGRESS.md. Write `docs/plans/live-migration-steps.md` describing exactly how Santosh should run this on the live DB at merge time (backup command first). **Agents never run it on live.**
 
@@ -202,10 +208,11 @@ Sizes: **XS** < 30 min · **S** ≈ 1 session · **M** ≈ 2 sessions (split it)
 
 **P3.4 PlanService consults the priority and roadmap engines** · S · depends P3.1
 - Primary-topic selection: honor a valid manual pin, else ask the curriculum for the next topic, ranked by `TopicPriorityEngine` among candidates the roadmap allows. Keep it a pure engine call wired in `context.ts`.
+- There is no `RoadmapEngine` today (P1.1). Roadmap data is `DSA_PREREQUISITES` plus visualization-only graph edges. This task introduces the consultation; it does not wrap an existing engine. `PlanService` already calls `computePriorityScore` after the topic is chosen, for a divergence note only.
 - This is the interim selector. Phase 7 replaces its internals with spiral passes behind `curriculumV2`.
 
 **P3.5 Difficulty by stage, not raw confidence** · S · depends P3.1
-- Replace confidence-only gating in `DifficultyEngine.ts` with stage-aware picking (use `topic-stage.ts` stages):
+- Current gates are confidence plus recent productivity, not confidence alone (P1.1): Medium as primary starts at 60 with productivity ≥ 60; ≥ 40 is Easy primary with Medium secondary; below 40 is Easy only. Coach assist discounts confidence first. Replace that table with stage-aware picking (use `topic-stage.ts` stages):
   - `learning` (attempts 1–2 in the pattern): 1 Easy, then a standard Medium.
   - `practicing` (attempt 3+): Medium. Drop to Easy only if the last attempt was `could-not-solve`.
   - `retaining` (confidence ≥ 70 and coach assist < 25%): Hard or hybrid Medium allowed.
