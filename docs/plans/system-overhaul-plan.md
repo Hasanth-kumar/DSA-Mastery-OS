@@ -254,6 +254,7 @@ Target model, with one job each:
 - Each block carries `problemId`, kind, estimated minutes, and a `reason` string ("hit wrong-approach on Oct 2, due today").
 - Keep the existing re-entry mode (≥ 3-day gap → one 20-minute Easy, no backlog) and catch-up compression rules.
 - A `decision` object explains the day: primary topic, stage, progress in pattern, and why.
+- P1.3 (`verification.md`, P1.3 section): the queue must be the only list of problems on Today (duplicates D1–D4). Invalidate the cached plan on `"resolve"` events too, so a skipped re-solve leaves Today at once. Build the plan once per poll, not also inside `/api/analytics/dashboard`.
 
 **P5.2 Actionable FocusCard** · S · depends P5.1
 - Each block has **Start** (timer), **✓ Done** (opens the unified completion flow), and **Coach ↗**. Completing a block advances the queue in place. No scrolling, no hunting.

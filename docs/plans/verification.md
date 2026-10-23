@@ -146,3 +146,63 @@ Code reading on `overhaul` at the P1.2 session (2026-10-23). No database was ope
 - P4.1 is not skipped. It has two real replacements: F4 (FSRS-based urgency, needed by P3.4's ranking) and F6 (`revision_count` independent of the warm-up skip). F1–F3 need an off switch, not a new signal: due re-solves already come from problem FSRS.
 - P4.3 should also stop F3's compression write and F2's revision minutes when `hideTopicRevision` is on. Hiding only U1–U3 leaves the plan rescheduling hidden topics and still budgeting time for them.
 - P3.4 runs before P4.1 and will rank with SM-2 urgency. That is acceptable as an interim; P4.1 then swaps the urgency input without touching the ranking code.
+
+## P1.3 — Today page data flow
+
+Code reading on `overhaul` at the P1.3 session (2026-10-23). No database was opened. This is the input for Phase 5.
+
+**Fetches.** `TodayPage.tsx` polls six endpoints every 60 seconds (`usePolling`). The client keeps its own short cache in front of each (`client.ts` `CACHE_TTL`, 15–30 seconds). The backend caches the plan in the in-process `CacheService` under `plan:<date>` for one hour.
+
+| Endpoint | Client call | Source service | Today reads |
+|---|---|---|---|
+| `GET /api/plan/today` | `api.getPlan` | `PlanService.generateTodaysPlan` → `buildPlan`: `CurriculumService.selectForTopics` (primary topic), `DifficultyEngine` + `ProblemSuggestionService.selectForTopic` (suggested problems), `RevisionEngine` queue + `compressRevisionQueue` (revision topics), `selectRevisionProblems` → `ProblemRepository.findSolvedByTopicId` (revision problems), `ProblemReviewService.dueSlots` (re-solve slots), `computePriorityScore` (divergence flag), `buildFocusPlan` (focus) | Nearly everything below |
+| `GET /api/session?limit=100` | `api.getSessions` | `SessionService.list` | Stats strip "This month" (`todayStats.ts`) |
+| `GET /api/topics` | `api.getTopics` | `TopicRepository.findAll` + `IntelligenceOrchestrator.scoreTopics` | Mastery ring and "Mastered" cell (status counts only; `scores` unused, see U10) |
+| `GET /api/analytics/streak` | `api.getStreak` | `AnalyticsService.getStreak` | Stats strip "Streak" |
+| `GET /api/analytics/dashboard?weeks=4` | `api.getDashboard` | `AnalyticsService.getDashboard` **and** `PlanService.generateTodaysPlan` (`analytics.routes.ts:25`) | Stats strip "Pace" (`summary.problemsPerHour`, `velocityTrend`). The embedded `plan` is ignored. |
+| `GET /api/sync/status` | `api.getSyncStatus` | `NotionSyncService.getSyncHealth` + `CardBankSyncService.getHealth` | "Synced N ago" link (`lastSyncAt`) |
+
+On-demand calls: `GET /api/problems/:id/note` once per suggested problem on every plan change (`ObsidianNoteService`), `GET /api/topics/:id/score/explain` on "Why this?", `GET /api/revision` on "Show all N →", and `POST /api/sync` from the sync link (Notion pull/push, then `scanVault`).
+
+**Components, top to bottom.**
+
+| # | Surface (`TodayPage.tsx` line) | Data | Actions → endpoint → service |
+|---|---|---|---|
+| T1 | Focus meta row and sync link (362) | `plan.curriculum` step, `sync.lastSyncAt` | Sync → `POST /api/sync` → `NotionSyncService.sync` |
+| T2 | `SessionProgress` strip (393) | Local `flow`, `starts` (localStorage) | None |
+| T3 | `FocusCard` (400) | `plan.focus` from `FocusPlanner.buildFocusPlan`: `resolve` blocks from `resolveSlots[0]` (and `[1]` if budget allows), one `learn` block from `suggestedProblems[0]`, a `log` block, week progress, mistake checklist | **None.** Titles link to LeetCode only. No Start, Done or Coach. |
+| T4 | Focus hero (402): primary topic, `plan.reasoning`, "Recall ≠ execution" chip, Start session, "Why this?", `MasteryRing` | `plan.primaryTopic`, `plan.reasoning`, `plan.memoryExecutionDivergence`, `/api/topics` counts | Start session → T5. "Why this?" → `GET /api/topics/:id/score/explain` → `ScoreBar` |
+| T5 | `WarmupCard` (455), only while `flow = warmup` | `GET /api/warmup` → `WarmupService` → `CardService` (local FSRS cards) | Reveal → `POST /api/warmup/answer` (local bank). Grade → `POST /api/warmup/grade` → `CardService.warmupGrade`. On finish it starts the timer on `suggestedProblems[0]` and opens its LeetCode link. |
+| T6 | `MistakeCapture` → note offer → revision offer → revision active (471–604) | `attemptId` from the log result; `plan.revisionProblems[0]` | `PATCH /api/attempts/:id/mistake`; `POST /api/problems/:id/note/template`; revision "recall" → `POST /api/revision/:topicId/grade` (SM-2); revision "resolve" ✓ Done → `POST /api/session` |
+| T7 | Stats strip (607), hidden in focus mode | streak, sessions, dashboard pace, topic counts | None |
+| T8 | Suggested problems (644): up to 3 rows | `plan.suggestedProblems.slice(0, 3)`, notes | Start (localStorage timer + LeetCode tab); ✓ Done → `POST /api/session` → `SessionService.completeSession` (attempt, SM-2 on primary topic, `evaluateAdmission`) → T6; Coach ↗ → Coach tab |
+| T9 | `ResolveTodaySection` (752): promoted slots open, the rest behind "▶ Re-solve (N due)" | `plan.resolveSlots`; also polls `GET /api/resolve/queue` every 60 s, only for `slowThresholdMin` | ✓ Done → `ResolveCompleteForm` → `POST /api/resolve/:id/complete` → `ProblemReviewService.complete` (attempt + FSRS). Skip → `POST /api/resolve/:id/skip` |
+| T10 | Revision column (759): `topRevision`, `revisionProblems` rows with `RevisionGradeButtons`, "Show all N →" | `plan.revisionTopics[0]`, `plan.revisionProblems`, `plan.revisionTotalDue`; `GET /api/revision` | Grade → `POST /api/revision/:topicId/grade` → `SessionService.applyRecallQuality` (SM-2) |
+| T11 | Up next (865), hidden in focus mode | `plan.curriculum.items` → `UpNextTimeline` | None |
+
+### Duplicates
+
+| # | Same thing shown in | When |
+|---|---|---|
+| D1 | `suggestedProblems[0]`: T3 `learn` block **and** T8 row 01 | Every normal day with a real suggestion (`FocusPlanner.ts:229`). On re-entry days T3 picks the easiest suggestion, which may be any of the three. |
+| D2 | `resolveSlots[0]` (and `[1]`): T3 `resolve` block **and** T9 | Every day with a due re-solve. In T9 it sits behind the collapsed toggle unless promoted. Defaults are 1 slot on weekdays, 2 on weekends (`RESOLVE_SLOTS_WEEKDAY/WEEKEND`). |
+| D3 | A solved problem in T10 (`findSolvedByTopicId`, status `Solved` only) **and** T9 / T3 | Possible when that problem also has a due `problem_reviews` row. `PlanService` does not de-duplicate the two lists. The topic must differ from the primary topic (F1 excludes it). |
+| D4 | `plan.revisionProblems[0]`: T10 row **and** the T6 post-solve revision offer | Every day revision is due, until the once-per-day `localStorage` guard fires. |
+| D5 | Two "start" paths for the same first problem: T4 Start session (warm-up, then auto-starts `suggestedProblems[0]`) and T8 Start | Always. T3 offers neither. |
+| D6 | Two plan builds per poll cycle: `/api/plan/today` and `/api/analytics/dashboard` both call `generateTodaysPlan` | Every 60 s. The second hits the server cache unless it was just invalidated; when uncached, either one may run the F3 deferral write and `dueSlots({ persistDeferrals: true })`. Today discards the dashboard's copy. |
+| D7 | Two due-slot computations: `plan.resolveSlots` (cached up to an hour) and `GET /api/resolve/queue` `slots` (live, not persisted) | Every 60 s. T9 renders the plan's copy and uses the queue only for `slowThresholdMin`. |
+
+### Inconsistencies found while tracing (not fixed here)
+
+- **Three completion paths for a problem.** T8 ✓ Done logs a session (SM-2 on the primary topic, admission check, MistakeCapture). T9 ✓ Done uses the FSRS form with an outcome picker and no MistakeCapture. T6 "resolve" ✓ Done logs a session against the *revision topic*. For a problem already in the pool, `evaluateAdmission` returns early (`ProblemReviewService.ts:132`), so that re-solve writes an attempt but does not update its `problem_reviews` row. P4.2's single completion path removes all three splits.
+- **A skipped or admitted re-solve can stay on Today for up to an hour.** `skip`, `admit` and `setFlags` publish only `"resolve"` (`ProblemReviewService.ts:147, 156, 283, 295`). The `context.ts:156` subscriber invalidates the plan on `session`, `topic`, `problem` and `attempt`, not `resolve`. The frontend drops its own `plan` cache, but the refetch returns the server's cached plan with the old slot. `complete` also publishes `"attempt"`, so completion is not affected. P5.1 should invalidate the plan on `"resolve"` or build the queue uncached.
+- **"3 warm-up cards queued"** in T4 is static text (`TodayPage.tsx:439`). It shows even when the topic has no due cards.
+- **The `log` block in T3** asks for "one line: what was the key insight?", but no field exists for it until P6.2.
+- **T8's empty text** says "add some in Notion" when `suggestedProblems` is empty. When there are no `Not started` problems, `ProblemSuggestionService` returns placeholder rows (`-suggested-` ids, "add problems in Notion") instead, which T8 renders as normal rows with Done buttons and T3 filters out. That is the #7 deadlock surface; P3.1 fixes the cause.
+
+### What this means for Phase 5
+
+- P5.1's ordered queue replaces T3, T8, T9 and T10 as the single list of problems, which removes D1–D4. The `decision` object replaces T4's `reasoning`.
+- P5.2 gives each queue block the Start, ✓ Done and Coach ↗ actions that T3 lacks today, and routes ✓ Done to P4.2's single completion path.
+- P5.4 hides T8, T9 and (with `hideTopicRevision`) T10 and the T6 revision offer. The warm-up (T5) and the MistakeCapture and note chain (T6) stay.
+- Keep one plan build per poll. No frontend page reads the `plan` embedded in `/api/analytics/dashboard` (Today and `OverviewPage` read only the dashboard fields), and WhatsApp and the coach call `generateTodaysPlan` directly, so that route can stop building it.
