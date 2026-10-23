@@ -7,7 +7,7 @@
 | P0.2 | done | 54b560f | snapshot and reset scripts; refuse live paths |
 | P0.3 | done | 9968459 | script only; baseline-metrics.md is local-only (no dev db) and gitignored |
 | P1.1 | done | 9b234f2 | code verdicts in verification.md; data queries local-only |
-| P1.2 | todo | | |
+| P1.2 | done | 0c66fa9 | SM-2 dependents in verification.md; 7 feed decisions, 10 UI only |
 | P1.3 | todo | | |
 | P2.1 | todo | | |
 | P2.2 | todo | | |
@@ -38,6 +38,13 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-23 — P1.2 Map dependents of topic-level SM-2
+- Did: Added a P1.2 section to `docs/plans/verification.md` listing every reader of `next_revision_at`, `sm2_interval`, `sm2_repetition` and `sm2_efactor`, plus `revision_count` and `last_revised` where they share the SM-2 paths. No behavior change. Seven readers feed decisions: the plan's revision queue (F1), its 25 minutes per revision topic (F2), the plan's deferral write that pushes `next_revision_at` forward on every uncached plan build (F3), `urgencyScore` in topic priority (F4), the memory/execution divergence sentence that reaches Today, WhatsApp and the coach prompt (F5), the warm-up skip that also stops `revision_count` from incrementing, which the weakness signal reads (F6), and the SM-2 writers themselves (F7). Ten are UI only: the Today revision column, the post-solve revision offer, the divergence chip, the "Why this?" urgency text, `GET /api/revision`, the graph's due ring and label, the WhatsApp plan and log replies, the Notion push, and the unused `scores` on `GET /api/topics`. Added short notes to P4.1 and P4.3 in the plan.
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). Docs only, no new tests.
+- Data check: code-only mode — no `.env`, no credentials, no `data/dev/dsa.dev.db`. No data queries were needed for this task.
+- Surprises / plan corrections: P4.1 is not skipped. F4 and F6 need replacement signals, and F1–F3 need an off switch. P4.3 should stop the deferral write and the revision minutes as well as hiding the UI, or hidden topics keep being rescheduled and budgeted. P3.4 will rank on SM-2 urgency until P4.1 swaps its input. `availableMinutes` trimming is latent: Today does not send it. **Test hygiene:** `packages/backend/src/health.test.ts` calls `createAppContext(loadConfig("/nonexistent/.env"))`, which opens `./data/sqlite/dsa.db` at the default path and runs migrations against it. In this checkout `pnpm test` created an empty, gitignored `data/sqlite/dsa.db`, which I deleted. In a folder where that path is a real mirror, the test would open it. See Ideas and QUESTIONS.md.
+- Next suggested task: P1.3 (code-only).
+
 ### 2026-10-22 — P1.1 Verify problems #1, #6, #7, #8 in code and data
 - Did: Wrote `docs/plans/verification.md` from code, with no behavior change. Confirmed the "Revision needed" deadlock: `buildProblemCounts()` counts every non-`Solved` status as unsolved, and `findUnsolvedByTopicId()` returns only `"Not started"`, so suggestions fall through to the "add problems in Notion" placeholder. The default curriculum is 12 labels, each resolving to one topic. Primary-topic selection is `CurriculumEngine` only. Corrected the plan: keep the existing SM-2 caps (7 / 21 / 45 / 120), there is no `RoadmapEngine`, and Medium-as-primary starts at confidence ≥ 60 with recent productivity ≥ 60.
 - Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). No new tests.
@@ -74,4 +81,4 @@
 - Next suggested task: P0.1
 
 ## Ideas (not scheduled)
-- ...
+- Point `packages/backend/src/health.test.ts` at a temp `SQLITE_PATH` / `DSA_DB_PATH` like the other backend tests, so `pnpm test` never opens or creates `./data/sqlite/dsa.db`. Waiting on QUESTIONS.md [Q-health-test].
