@@ -8,7 +8,7 @@
 | P0.3 | done | 9968459 | script only; baseline-metrics.md is local-only (no dev db) and gitignored |
 | P1.1 | done | 9b234f2 | code verdicts in verification.md; data queries local-only |
 | P1.2 | done | 0c66fa9 | SM-2 dependents in verification.md; 7 feed decisions, 10 UI only |
-| P1.3 | todo | | |
+| P1.3 | done | 738d136 | Today data flow in verification.md; 11 surfaces, 7 duplicates |
 | P2.1 | todo | | |
 | P2.2 | todo | | |
 | P3.1 | todo | | |
@@ -38,6 +38,13 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-23 — P1.3 Map the Today page data flow
+- Did: Added a P1.3 section to `docs/plans/verification.md`. It lists the six endpoints Today polls every 60 seconds and the service behind each, the 11 surfaces on `TodayPage.tsx` (T1–T11) with their data and actions, and seven duplicates (D1–D7). The same new problem appears in FocusCard and as Suggested row 01 (D1). The same due re-solve appears in FocusCard and in the Re-solve section (D2). A solved problem can appear in both the Revision column and the re-solve slots (D3). The first revision problem appears in the Revision column and in the post-solve offer (D4). There are two Start paths (D5). The plan is built twice per poll, once by `/api/plan/today` and once inside `/api/analytics/dashboard`, whose copy no page reads (D6). Due slots are computed twice (D7). FocusCard has no actions at all. Added a short P1.3 note to P5.1 in the plan. No behavior change.
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). Docs only, no new tests. This VM had no `node_modules`, so I ran `pnpm install --frozen-lockfile` first (no lockfile change). The health test again created `data/sqlite/dsa.db`, which I deleted.
+- Data check: code-only mode — no `.env`, no credentials, no `data/dev/dsa.dev.db`. No data queries were needed for this task.
+- Surprises / plan corrections: there are three completion paths for a problem. Suggested ✓ Done logs a session. Re-solve ✓ Done uses the FSRS form without MistakeCapture. The post-solve revision offer's ✓ Done logs a session against the revision topic, and for a problem already in the pool that writes an attempt but leaves its `problem_reviews` row unchanged. P4.2 covers this. **Bug (not fixed):** re-solve `skip`, `admit` and `setFlags` publish only `"resolve"`, which the `context.ts` subscriber does not treat as a plan invalidation. A skipped re-solve can stay on Today until the one-hour server cache expires. Noted for P5.1. "3 warm-up cards queued" on the hero is static text.
+- Next suggested task: P2.1 (code-only).
+
 ### 2026-10-23 — P1.2 Map dependents of topic-level SM-2
 - Did: Added a P1.2 section to `docs/plans/verification.md` listing every reader of `next_revision_at`, `sm2_interval`, `sm2_repetition` and `sm2_efactor`, plus `revision_count` and `last_revised` where they share the SM-2 paths. No behavior change. Seven readers feed decisions: the plan's revision queue (F1), its 25 minutes per revision topic (F2), the plan's deferral write that pushes `next_revision_at` forward on every uncached plan build (F3), `urgencyScore` in topic priority (F4), the memory/execution divergence sentence that reaches Today, WhatsApp and the coach prompt (F5), the warm-up skip that also stops `revision_count` from incrementing, which the weakness signal reads (F6), and the SM-2 writers themselves (F7). Ten are UI only: the Today revision column, the post-solve revision offer, the divergence chip, the "Why this?" urgency text, `GET /api/revision`, the graph's due ring and label, the WhatsApp plan and log replies, the Notion push, and the unused `scores` on `GET /api/topics`. Added short notes to P4.1 and P4.3 in the plan.
 - Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). Docs only, no new tests.
@@ -81,4 +88,5 @@
 - Next suggested task: P0.1
 
 ## Ideas (not scheduled)
+- Treat `"resolve"` events as a plan invalidation in the `context.ts` subscriber, so a skipped or admitted re-solve updates Today immediately (P1.3). Folded into P5.1 unless Santosh wants it sooner.
 - Point `packages/backend/src/health.test.ts` at a temp `SQLITE_PATH` / `DSA_DB_PATH` like the other backend tests, so `pnpm test` never opens or creates `./data/sqlite/dsa.db`. Waiting on QUESTIONS.md [Q-health-test].
