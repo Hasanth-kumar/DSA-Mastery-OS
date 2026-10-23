@@ -230,6 +230,7 @@ Target model, with one job each:
 
 **P4.1 Replacement signal for any decision that reads SM-2** · S · depends P1.2
 - For each "feeds decisions" dependent found in P1.2, derive the signal from problem-level FSRS (for example, a topic is "due" if it has ≥ 1 overdue re-solve; topic retention = mean FSRS retrievability of its problems). Pure function plus tests. Skip this task if P1.2 found none.
+- P1.2 found two that need a replacement (`verification.md` F4, F6): `urgencyScore` in topic priority, and `revision_count` skipping increments after a graded warm-up. The plan's revision queue, its duration minutes and its deferral write (F1–F3) need an off switch, not a new signal.
 
 **P4.2 One completion flow for new problems and re-solves** · M (split: backend, then UI) · depends P3.2
 - *Backend:* a single "complete attempt" service path that handles both kinds. It infers the FSRS rating from solve time versus the target (25 / 45 / 75 min for E/M/H), help level, and mistake tags, so no manual rating is needed. A problem that was hard or needed help enters or updates `problem_reviews`. A clean, fast cold solve extends its interval and can eventually retire it.
@@ -238,6 +239,7 @@ Target model, with one job each:
 
 **P4.3 Hide the topic Revision column and the post-solve revision popup** · XS · depends P4.1
 - Behind `hideTopicRevision`. Hide only; don't delete code until after merge and a week of live use.
+- With the flag on, `PlanService` also skips the revision queue's deferral write and its 25 minutes per revision topic (P1.2, `verification.md` F2–F3). Otherwise hidden topics keep being rescheduled and budgeted.
 
 **P4.4 Demote flashcards from the hot path** · XS
 - Warm-up on Today becomes optional and collapsed (default **off**; 🔶 Santosh decides). The Review tab is unchanged.

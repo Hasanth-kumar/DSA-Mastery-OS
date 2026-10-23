@@ -95,3 +95,54 @@ When a dev database exists, read `pnpm dev:metrics` (do not commit it) and recor
 - The `curriculum_active_topic_id` line, and the topic name it points at.
 - How many topic rows exist against the 12 default labels.
 - Whether any topic has `"Revision needed"` problems and zero `"Not started"` problems. The metrics script prints global status counts only, so this cross-check is a separate read of the dev copy.
+
+## P1.2 — Dependents of topic-level SM-2
+
+Code reading on `overhaul` at the P1.2 session (2026-10-23). No database was opened. This gates Phase 4.
+
+**Fields.** The SM-2 state on `topics` is `next_revision_at` (`nextRevisionAt`), `sm2_interval`, `sm2_repetition` and `sm2_efactor`. Two neighbouring fields are written on the same paths and are listed where they matter: `revision_count` and `last_revised`. `last_revised` is set by every completed session as well as by the recall grade, so it outlives SM-2. `cards.due` and `WarmupGradeResult.nextRevisionAt` (`CardService.ts`) are per-card FSRS and are out of scope, despite the shared field name.
+
+**Classes.** *UI only*: displays the value, or sends it somewhere a person reads it, and changes no decision. Safe to hide. *Feeds decisions*: changes what the plan serves, how a topic is scored, or what other state is written. Needs a replacement signal or an explicit removal.
+
+### Readers that feed decisions
+
+| # | Reader | What it decides | Replacement (P4.1) |
+|---|---|---|---|
+| F1 | `PlanService.buildPlan` → `IntelligenceOrchestrator.getRevisionQueue` → `RevisionEngine.getRevisionQueue` / `isDue` (`PlanService.ts:80`) | Due topics (any non-`Not started` topic with `nextRevisionAt` null or past), excluding the primary topic. They become `plan.revisionTopics`, `revisionTotalDue`, and through `selectRevisionProblems` one solved problem per topic in `plan.revisionProblems`. | Under `hideTopicRevision`, return empty revision lists. Due re-solves already come from `ProblemReviewService.dueSlots` (problem FSRS). If a topic-level "due" flag is still wanted: the topic has ≥ 1 overdue `problem_reviews` row. |
+| F2 | `PlanService.estimateDuration` (`PlanService.ts:230`) | Adds 25 minutes per revision topic. When `availableMinutes` is passed, that total drops non-promoted re-solve slots first (`PlanService.ts:120`). Today does not pass `availableMinutes` (`client.ts` calls `/api/plan/today` with no query), so this is latent; the API query parameter still reaches it. | Drop the revision minutes when F1 is off, so retired topic revision never displaces an FSRS re-solve. |
+| F3 | `RevisionEngine.compressQueue` via `compressRevisionQueue` (`PlanService.ts:86`) | Writes, not only reads. On every uncached `generateTodaysPlan` (Today, `/api/analytics/dashboard`, the coach chat context in `ChatService.ts:424`, the WhatsApp `plan` command), overflow topics get `nextRevisionAt` pushed forward with `topicRepo.bulkUpdate`. | Stop this write together with F1. Hiding the UI alone leaves it running. |
+| F4 | `urgencyScore` in `topic-priority-engine/scoring.ts:31` | Urgency is 30% of `computePriorityScore` (default weights). It sets `recommendation` ("Study now", "Review soon") and, with weakness ≥ 0.4 and urgency < 0.1, `memoryExecutionDivergence` and its +12 boost. Today the score only annotates the chosen topic (P1.1). **P3.4 makes this score rank primary-topic candidates**, so it becomes decision-critical in Phase 3, before Phase 4 starts. | Urgency from problem FSRS: overdue re-solve count for the topic, or 1 − mean retrievability of its `problem_reviews`. Pure function in `@dsa/intelligence`, fed by the backend. Topics with no reviews keep the "never studied" rule from `last_revised`. |
+| F5 | `memoryExecutionDivergence` consumers (from F4) | Appends "practice anyway despite a far-out review date" to `plan.reasoning` (`PlanService.ts:140`). That reasoning reaches the Today hero, the WhatsApp plan message, and the coach system prompt (`ChatService.ts:434`). Also fills `plan.divergentTopics` and `WeeklySummary.divergentTopics` (`AnalyticsService.ts:201`). Neither divergent list is rendered in the frontend or in the WhatsApp digest. | Follows F4. With FSRS urgency the label means "no overdue re-solve, but still weak". Reword the sentence, which names a review date. |
+| F6 | `SessionService.applySessionToTopic` `skipScheduling` (`SessionService.ts:177`) | When the warm-up was graded (`warmupGraded` from Today, or the same-day `sync_meta` key `warmup_srs:<topicId>` set by the recall grade), the session writes no SM-2 state and does not increment `revision_count`. `revision_count > 0 && confidence < 50` is one branch of `revisionFailureSignal` (`weakness-engine/signals.ts:97`, weight 0.125), which feeds `isWeakArea`. So a flashcard (FSRS) warm-up grade currently changes a topic-level counter that weakness reads. | When SM-2 is retired, increment `revision_count` on every completed session (drop the `skipScheduling` branch for it), or replace the branch with "has ≥ 1 attempt". No new signal needed. |
+| F7 | `readSM2State` / `topicToSM2Quality` / `sm2Update` via `updateAfterSession` and `applyRecallQuality` | The SM-2 writers themselves: completed sessions (unless F6 skips) and `POST /api/revision/:topicId/grade`. They read the prior interval, repetition and ease. | None. Retiring SM-2 means removing these calls. Keep the code until after merge per P4.3. |
+
+### Readers that are UI only
+
+| # | Reader | Surface |
+|---|---|---|
+| U1 | `TodayPage.tsx` revision column (`topRevision`, `revisionProblems` rows, `RevisionGradeButtons`, "Show all N →" list from `GET /api/revision`) | Today. Shows `last revised`, `next review`, `due <date>`. Grades write SM-2 through F7. |
+| U2 | `TodayPage.tsx` post-solve `revision-offer` / `revision-active` flow (`finishCapture`, once per day by `dsa-revision-offer-day`) | Today, after MistakeCapture. Offers `plan.revisionProblems[0]`. Hidden by P4.3. |
+| U3 | `TodayPage.tsx` "Recall ≠ execution" chip | Today hero. Shows F5's flag. |
+| U4 | `ScoreBar` with `GET /api/topics/:id/score/explain` (`explain.ts`) | Today "Why this?". Urgency segment and its "revision is overdue / not yet due" text. Follows F4. |
+| U5 | `GET /api/revision` (`revision.routes.ts:10`) | Feeds U1's full list; also returns `dueWithin24h`, which nothing reads. |
+| U6 | `KnowledgeGraph.tsx:96` `isDue` ring, and `GraphPage.tsx:64` `dueLabel` | Graph tab: dashed "Revision due" ring and the node detail line. |
+| U7 | `formatStudyPlanForWhatsApp` (`plan.formatter.ts:18`) | WhatsApp `plan` reply: "🔄 REVISION (N)" with "(overdue)". |
+| U8 | `completeSession` result `nextRevisionAt` and summary "Next review: …" (`SessionService.ts:282`) | WhatsApp log reply (`WhatsAppCommandService.ts:192`). The Today page ignores both fields. |
+| U9 | Notion push (`NotionSyncService` → `NotionClient.updateTopic` "Next Review", interval, ease) | Notion topic properties a person reads in Notion. Pull keeps the local schedule (`preserveLocalSchedule` in `integrations/src/sqlite/sync.ts`) and seeds it only for a new topic, so Notion never drives a decision. |
+| U10 | `GET /api/topics` `scores` | Returned with the topic list; the frontend client types it but no component reads it. |
+
+### Tooling (neither class)
+
+- `planScheduleRepair` and `pnpm db:repair-schedules` (`schedule-repair.ts`, `scripts/repair-topic-schedules.ts`). Needed for P2.2 and the live migration. Retire after merge with the rest of SM-2.
+- `pnpm dev:metrics` prints `next_revision_at` and `sm2_interval`. Keep while the overhaul compares before and after.
+- `buildTopicState` and `AnalyticsService.topicToInput` only map the fields. The analytics metrics (velocity, weakness trend, difficulty) do not read them.
+
+### Not dependent
+
+`CurriculumEngine` and `CurriculumService`, `DifficultyEngine`, `FocusPlanner`, `ProblemReviewEngine`, `WeaknessEngine` (apart from `revision_count` in F6), `deriveTopicStatusAfterSession`, and confidence updates (`confidenceDeltaForScore` uses the session score, not SM-2 quality) read none of the SM-2 fields.
+
+### What this means for Phase 4
+
+- P4.1 is not skipped. It has two real replacements: F4 (FSRS-based urgency, needed by P3.4's ranking) and F6 (`revision_count` independent of the warm-up skip). F1–F3 need an off switch, not a new signal: due re-solves already come from problem FSRS.
+- P4.3 should also stop F3's compression write and F2's revision minutes when `hideTopicRevision` is on. Hiding only U1–U3 leaves the plan rescheduling hidden topics and still budgeting time for them.
+- P3.4 runs before P4.1 and will rank with SM-2 urgency. That is acceptable as an interim; P4.1 then swaps the urgency input without touching the ranking code.
