@@ -64,6 +64,7 @@ export {
 export { formatWarmupAnswer, isWalkthroughWarmupAnswer } from "./warmup/formatAnswer.js";
 
 export { DEFAULT_CURRICULUM_TOPICS } from "./curriculum-engine/default-topics.js";
+export { buildTopicProblemCounts, isRemainingFirstPass } from "./problem-progress.js";
 export {
   createCurriculumEngine,
   type CurriculumConfig,

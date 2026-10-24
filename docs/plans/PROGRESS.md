@@ -11,7 +11,7 @@
 | P1.3 | done | 738d136 | Today data flow in verification.md; 11 surfaces, 7 duplicates |
 | P2.1 | done | c1f4139 | regression test only; existing 7/21/45/120 caps kept |
 | P2.2 | todo | | local-only (needs dev db) |
-| P3.1 | todo | | |
+| P3.1 | done | P31SHA | `problem-progress.ts`; Revision needed = covered; checked on a read-only dev-DB copy |
 | P3.2 | todo | | |
 | P3.3 | todo | | |
 | P3.4 | todo | | |
@@ -38,6 +38,14 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-24 — P3.1 One definition of "covered" vs "mastered"
+- Did: Added `packages/intelligence/src/problem-progress.ts`. `isFirstPassCovered` is `Solved` or `Revision needed`. `isRemainingFirstPass` is everything else, which with normalized statuses means `Not started` or a null status. `buildTopicProblemCounts` builds the curriculum's per-topic totals from it. `CurriculumService.buildProblemCounts` now calls `buildTopicProblemCounts`. `ProblemRepository.findUnsolvedByTopicId` is replaced by `findRemainingFirstPassByTopicId`, which filters with `isRemainingFirstPass` (same Easy → Medium → Hard order, same limit). `ProblemSuggestionService` uses it. The old SQL `status = 'Not started'` filter and the `status !== "Solved"` count are gone. The curriculum's `unsolved` field keeps its name and now means "remaining in the first pass".
+- Same session, before P3.1: Santosh decided how Today should look with `todayQueueV2`. A due re-solve is the first, marked row of the Suggested problems list. It logs exactly like a new problem (Start → timer → ✓ Done → MistakeCapture). The separate Re-solve section, topic Revision column, post-solve revision offer and FocusCard are hidden. D8 answered: 1 re-solve per day. Recorded in the design doc §3.3, plan P4.2 / P5.2 (renamed "Render the queue in the Suggested problems list") / P5.4, and QUESTIONS.md (commit `d82b116`).
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). New: `packages/intelligence/src/problem-progress.test.ts` (7 tests) and `packages/backend/src/curriculum-first-pass.test.ts` (3 tests: a topic with only `Revision needed` problems counts as complete; suggestions exclude `Revision needed` and include null status; `/api/plan/today` moves past the covered topic and serves real problems, never the "add problems in Notion" placeholder). Mutation check: with `isFirstPassCovered` reduced to `Solved` only, all six new behavior tests fail; restored. The health test again created `data/sqlite/dsa.db`, which I deleted.
+- Data check: first run with the dev DB available (in the Desktop worktree). Read a copy of `data/dev/dsa.dev.db` only; the dev DB was not opened or changed. Problems: 243 Not started, 37 Revision needed, 6 Solved. 50 topics. Three topics have zero `Not started` problems: Fast & Slow Pointers (5 RN, 2 S), Recursion & Backtracking (9 RN, 1 S), Binary Search + Prefix Sum (4 RN). `curriculum_active_topic_id` is pinned to **Greedy Sorting** (confirms the P1.1 local-only item; P3.3 handles it). `curriculum_topics` is unset, so the 12 default labels apply. Unpinned selection on a throwaway copy: old rule → "Binary Search + Prefix Sum" (0 of 4 problems `Not started`, so suggestions would be the placeholder). New rule → BFS, suggesting "As Far from Land as Possible" and "Binary Tree Right Side View".
+- Surprises / plan corrections: label resolution is looser than P1.1 described. With the real topic names, "Binary Search" resolves to "Binary Search + Prefix Sum", both "Trees" and "Graphs" resolve to BFS (so two curriculum items show the same topic), and "Greedy" resolves to a 2-problem topic rather than Greedy Sorting. The 12-label list therefore reaches fewer than 12 distinct topics. Not fixed here: P3.4 changes primary-topic selection and P7.1 maps all 50 topics to tiers. Noted for both.
+- Next suggested task: P2.2 (needs the dev DB; the Desktop worktree has it), then P3.2.
+
 ### 2026-10-24 — P2.1 Confirm the scorer fix stops the corruption
 - Did: Added one regression test to `packages/backend/src/services/session-outcome-scoring.test.ts`. It runs the production path: four coach hints recorded through `ctx.coachUsage`, then `SessionService.completeSession`, then `RevisionEngine.applyQuality`. The weak topic (confidence 20) starts from a grown SM-2 state (interval 30, repetition 4, ease 2.5). A 1-minute session logged as smooth scores below 80, so it does not get SM-2 quality 5. The interval stays at or under the 7-day cap for confidence below 40, and `next_revision_at` is no more than 7 days out. The ease factor drops below 2.5, which only happens at quality 3 or lower. No production code changed. The 7 / 21 / 45 / 120 caps and the rule that quality ≥ 3 lengthens the interval are unchanged.
 - Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). Mutation check: with the cap in `RevisionEngine.applyQuality` replaced by infinity, the new test fails (interval 71 days against a cap of 7), and so does the existing "never schedules a topic beyond…" test. I then restored the cap. The health test again created `data/sqlite/dsa.db`, which I deleted.
@@ -95,5 +103,6 @@
 - Next suggested task: P0.1
 
 ## Ideas (not scheduled)
+- Default curriculum labels resolve by substring (`namesMatch`), so on the real 50 topics "Trees" and "Graphs" both hit BFS and "Binary Search" hits "Binary Search + Prefix Sum" (P3.1 data check). Fold into P3.4 / P7.1 rather than patch the matcher now.
 - Treat `"resolve"` events as a plan invalidation in the `context.ts` subscriber, so a skipped or admitted re-solve updates Today immediately (P1.3). Folded into P5.1 unless Santosh wants it sooner.
 - Point `packages/backend/src/health.test.ts` at a temp `SQLITE_PATH` / `DSA_DB_PATH` like the other backend tests, so `pnpm test` never opens or creates `./data/sqlite/dsa.db`. Waiting on QUESTIONS.md [Q-health-test].

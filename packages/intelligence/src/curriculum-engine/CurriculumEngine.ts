@@ -8,6 +8,7 @@ export type CurriculumItemStatus = CurriculumItem["status"];
 
 export interface TopicProblemCounts {
   total: number;
+  /** Problems remaining in the first pass (see `problem-progress.ts`). */
   unsolved: number;
 }
 

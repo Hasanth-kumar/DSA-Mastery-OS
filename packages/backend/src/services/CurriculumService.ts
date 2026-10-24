@@ -1,4 +1,5 @@
 import {
+  buildTopicProblemCounts,
   createCurriculumEngine,
   type CurriculumConfig,
   type CurriculumItem,
@@ -70,16 +71,9 @@ export class CurriculumService {
     };
   }
 
+  /** First-pass counts per topic: `Revision needed` counts as covered (P3.1). */
   buildProblemCounts(): Map<string, TopicProblemCounts> {
-    const counts = new Map<string, TopicProblemCounts>();
-    for (const problem of this.problemRepo.findAll()) {
-      if (!problem.topicId) continue;
-      const entry = counts.get(problem.topicId) ?? { total: 0, unsolved: 0 };
-      entry.total += 1;
-      if (problem.status !== "Solved") entry.unsolved += 1;
-      counts.set(problem.topicId, entry);
-    }
-    return counts;
+    return buildTopicProblemCounts(this.problemRepo.findAll());
   }
 
   selectForTopics(topics: TopicState[]): CurriculumSelection | null {

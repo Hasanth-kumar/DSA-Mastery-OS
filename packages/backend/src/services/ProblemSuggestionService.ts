@@ -23,7 +23,7 @@ export class ProblemSuggestionService {
     const difficulties: TopicDifficulty[] = [difficultyRec.primary];
     if (difficultyRec.secondary) difficulties.push(difficultyRec.secondary);
 
-    const unsolved = this.problemRepo.findUnsolvedByTopicId(topic.id, {
+    const unsolved = this.problemRepo.findRemainingFirstPassByTopicId(topic.id, {
       difficulties,
       limit,
     });
@@ -37,7 +37,7 @@ export class ProblemSuggestionService {
       }));
     }
 
-    const anyUnsolved = this.problemRepo.findUnsolvedByTopicId(topic.id, { limit });
+    const anyUnsolved = this.problemRepo.findRemainingFirstPassByTopicId(topic.id, { limit });
     if (anyUnsolved.length > 0) {
       return anyUnsolved.map((p) => ({
         problemId: p.id,
