@@ -64,4 +64,14 @@ Rollback: `pnpm db:backfill-resolve-pool --revert` removes exactly the rows `--a
 
 ## P3.3 — Clear the stale curriculum pin
 
-_Added with P3.3._
+Live is pinned to Greedy Sorting (the dev copy was). After the merge a pin ends by itself when the topic's first pass is complete or 7 days after it was set. A pin from before the merge has no date, so its 7-day clock starts the first time the app plans the day. To clear it right away instead, start the app and do either:
+
+- On Today, tap **Unpin** next to "Pinned · Greedy Sorting".
+- Or from a terminal:
+
+  ```bash
+  curl -s -X PUT http://127.0.0.1:3000/api/curriculum/active \
+    -H 'Content-Type: application/json' -d '{"topicId": null}'
+  ```
+
+Verify: Today no longer shows "Pinned", and the hero names the curriculum's next topic (BFS on the dev copy). Rollback: pin it again from Settings → Curriculum → Switch.

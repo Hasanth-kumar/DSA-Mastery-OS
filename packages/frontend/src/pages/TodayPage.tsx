@@ -305,6 +305,23 @@ export function TodayPage({ onOpenCoach }: Props) {
     }
   };
 
+  const [unpinning, setUnpinning] = useState(false);
+  const unpin = async () => {
+    setUnpinning(true);
+    setMessage(null);
+    try {
+      await api.setCurriculumActiveTopic(null);
+      void refresh();
+    } catch (err) {
+      setMessage({
+        text: err instanceof Error ? err.message : "Could not unpin",
+        ok: false,
+      });
+    } finally {
+      setUnpinning(false);
+    }
+  };
+
   const monthCount = useMemo(() => sessionsThisMonth(sessions ?? []), [sessions]);
   const monthHours = useMemo(() => studyHoursThisMonth(sessions ?? []), [sessions]);
   const dueTotal = plan?.revisionTotalDue ?? plan?.revisionTopics.length ?? 0;
@@ -340,6 +357,18 @@ export function TodayPage({ onOpenCoach }: Props) {
     ? `${plan.curriculum.currentIndex + 1} of ${plan.curriculum.topicNames.length}`
     : null;
 
+  // P3.3: a manual pin is shown with its end date and can be removed in one tap.
+  const pinnedTopicId = plan?.curriculum?.activeTopicId ?? null;
+  const pinnedName = pinnedTopicId
+    ? plan?.primaryTopic.id === pinnedTopicId
+      ? plan.primaryTopic.name
+      : (plan?.curriculum?.items.find((i) => i.topicId === pinnedTopicId)?.name ?? null)
+    : null;
+  const pinDaysLeft =
+    pinnedTopicId && plan?.curriculum?.pinExpiresAt != null
+      ? Math.max(1, Math.ceil((plan.curriculum.pinExpiresAt - Date.now()) / 86_400_000))
+      : null;
+
   const syncLabel = syncing
     ? "Syncing…"
     : sync?.lastSyncAt
@@ -368,6 +397,23 @@ export function TodayPage({ onOpenCoach }: Props) {
             {formatTodayDate()}
             {curriculumStep ? ` · step ${curriculumStep}` : ""}
           </span>
+          {pinnedTopicId && (
+            <>
+              <span className="today-focus-meta-date">
+                Pinned{pinnedName ? ` · ${pinnedName}` : ""}
+                {pinDaysLeft != null ? ` · ${pinDaysLeft} day${pinDaysLeft === 1 ? "" : "s"} left` : ""}
+              </span>
+              <button
+                type="button"
+                className="today-sync-link"
+                disabled={unpinning}
+                onClick={() => void unpin()}
+                title="Unpin and let the curriculum pick the next topic"
+              >
+                Unpin
+              </button>
+            </>
+          )}
         </div>
         <button
           type="button"

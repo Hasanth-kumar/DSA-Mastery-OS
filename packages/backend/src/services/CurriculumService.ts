@@ -1,6 +1,9 @@
 import {
   buildTopicProblemCounts,
   createCurriculumEngine,
+  evaluatePinExpiry,
+  PIN_MAX_AGE_DAYS,
+  type PinExpiryReason,
   type CurriculumConfig,
   type CurriculumItem,
   type CurriculumProgress,
@@ -13,6 +16,14 @@ import type { SyncMetaRepository } from "../repositories/SyncMetaRepository.js";
 
 const TOPICS_KEY = "curriculum_topics";
 const ACTIVE_TOPIC_KEY = "curriculum_active_topic_id";
+const PIN_SET_AT_KEY = "curriculum_active_topic_set_at";
+const PIN_LAST_EXPIRY_KEY = "curriculum_pin_last_expiry";
+
+export interface PinExpiryRecord {
+  topicId: string;
+  reason: PinExpiryReason;
+  at: number;
+}
 
 export interface CurriculumState {
   topicNames: string[];
@@ -55,15 +66,64 @@ export class CurriculumService {
     return this.syncMetaRepo.get(ACTIVE_TOPIC_KEY);
   }
 
-  setActiveTopicId(topicId: string | null): void {
+  setActiveTopicId(topicId: string | null, now = Date.now()): void {
     if (topicId) {
       this.syncMetaRepo.set(ACTIVE_TOPIC_KEY, topicId);
+      this.syncMetaRepo.set(PIN_SET_AT_KEY, String(now));
     } else {
       this.syncMetaRepo.set(ACTIVE_TOPIC_KEY, "");
+      this.syncMetaRepo.set(PIN_SET_AT_KEY, "");
     }
   }
 
+  /** When the current pin was set, ms; null when unpinned or set before P3.3. */
+  getPinnedAt(): number | null {
+    const raw = this.syncMetaRepo.get(PIN_SET_AT_KEY);
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  getLastPinExpiry(): PinExpiryRecord | null {
+    const raw = this.syncMetaRepo.get(PIN_LAST_EXPIRY_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as PinExpiryRecord;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * P3.3: clear the pin once the pinned topic's first pass is complete or
+   * the pin is 7 days old. A pin set before P3.3 has no date; its clock
+   * starts on the first check. Returns the expiry when one happened.
+   */
+  expirePinIfDue(now = Date.now()): PinExpiryRecord | null {
+    const topicId = this.getActiveTopicId();
+    if (!topicId) return null;
+
+    let pinnedAt = this.getPinnedAt();
+    if (pinnedAt == null) {
+      pinnedAt = now;
+      this.syncMetaRepo.set(PIN_SET_AT_KEY, String(now));
+    }
+
+    const decision = evaluatePinExpiry({
+      pinnedAt,
+      counts: this.buildProblemCounts().get(topicId),
+      now,
+    });
+    if (!decision.expired) return null;
+
+    const record: PinExpiryRecord = { topicId, reason: decision.reason, at: now };
+    this.setActiveTopicId(null, now);
+    this.syncMetaRepo.set(PIN_LAST_EXPIRY_KEY, JSON.stringify(record));
+    console.info(`[curriculum] pin on ${topicId} expired: ${decision.reason}`);
+    return record;
+  }
+
   getConfig(): CurriculumConfig {
+    this.expirePinIfDue();
     const active = this.getActiveTopicId();
     return {
       topicNames: this.getTopicNames(),
@@ -98,8 +158,14 @@ export class CurriculumService {
       topicNames: config.topicNames,
       currentIndex: selection.index,
       activeTopicId: config.activeTopicId ?? null,
+      pinExpiresAt: config.activeTopicId ? this.pinExpiresAt() : null,
       items: selection.items,
     };
+  }
+
+  private pinExpiresAt(): number | null {
+    const pinnedAt = this.getPinnedAt();
+    return pinnedAt == null ? null : pinnedAt + PIN_MAX_AGE_DAYS * 86_400_000;
   }
 
   resetToDefault(): string[] {

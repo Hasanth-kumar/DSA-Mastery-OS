@@ -66,6 +66,7 @@ export { formatWarmupAnswer, isWalkthroughWarmupAnswer } from "./warmup/formatAn
 
 export { DEFAULT_CURRICULUM_TOPICS } from "./curriculum-engine/default-topics.js";
 export { buildTopicProblemCounts, isRemainingFirstPass } from "./problem-progress.js";
+export { evaluatePinExpiry, PIN_MAX_AGE_DAYS, type PinExpiryReason } from "./curriculum-engine/pin-expiry.js";
 export {
   createCurriculumEngine,
   type CurriculumConfig,

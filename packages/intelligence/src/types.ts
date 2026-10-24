@@ -97,6 +97,8 @@ export interface CurriculumProgress {
   topicNames: string[];
   currentIndex: number;
   activeTopicId: string | null;
+  /** When the manual pin ends on age (P3.3), ms; null when unpinned or no clock yet. */
+  pinExpiresAt?: number | null;
   items: CurriculumItem[];
 }
 
