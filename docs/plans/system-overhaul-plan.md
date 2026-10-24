@@ -98,6 +98,8 @@ Every user-visible behavior change ships behind a flag stored in the app's setti
 
 Flags: `todayQueueV2`, `unifiedCompletion`, `hideTopicRevision`, `helpLevelCapture`, `takeawayField`, `curriculumV2`, `spiralPasses`.
 
+Where they live (decided 2026-10-24, [Q-flags]): `.env` as `FLAG_<NAME>=true|false` (for example `FLAG_HIDE_TOPIC_REVISION`), read by `loadConfig` into `AppConfig.flags`. Unset means **off**, so a merge leaves live unchanged; the overhaul worktree's `.env` sets them on. `GET /api/flags` exposes them read-only. `hideTopicRevision` means "topic SM-2 retired": it switches decision signals to problem FSRS (P4.1) as well as hiding the UI (P4.3).
+
 ---
 
 ## 2. Daily agent protocol (every scheduled run)
@@ -242,7 +244,7 @@ Target model, with one job each:
 - With the flag on, `PlanService` also skips the revision queue's deferral write and its 25 minutes per revision topic (P1.2, `verification.md` F2–F3). Otherwise hidden topics keep being rescheduled and budgeted.
 
 **P4.4 Demote flashcards from the hot path** · XS
-- Warm-up on Today becomes optional and collapsed (default **off**; 🔶 Santosh decides). The Review tab is unchanged.
+- Warm-up on Today becomes optional and collapsed (default **off**; decided by Santosh 2026-10-24, D5). The Review tab is unchanged.
 
 ### Phase 5 — One Today cockpit (#2)
 

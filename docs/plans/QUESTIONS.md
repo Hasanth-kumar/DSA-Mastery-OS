@@ -1,13 +1,13 @@
 # Questions for Santosh
 ## Open
 - [D4] Pass 2 gate: count only, or count + ≥ 2 clean cold solves — default count + clean. Asked 2026-10-19. Runs waiting: 0
-- [D5] Flashcard warm-up on Today: off / optional / always — default optional, off. Asked 2026-10-19. Runs waiting: 0
 - [D6] Build the pre-solve pattern gate? — default build, flag off. Asked 2026-10-19. Runs waiting: 0
 - [D7] Approve the topic tiers in `topic-tiers.md` — default proposal in P7.1. Asked 2026-10-19. Runs waiting: 0
 - [D9] Allow Notion reads in the worktree — default no; use dev DB only. Asked 2026-10-19. Runs waiting: 0
-- [Q-health-test] `packages/backend/src/health.test.ts` opens `./data/sqlite/dsa.db` (default path) and runs migrations, so `pnpm test` creates that file in a checkout without one, and would open it in a checkout that has a real mirror there. May an agent fix it as a small unscheduled test-only change (temp DB path, as in the other backend tests)? Default: no fix until answered; agents delete the stray empty file after each test run. Asked 2026-10-23. Runs waiting: 0
-- [Q-flags] Where do the feature flags (`todayQueueV2`, `unifiedCompletion`, `hideTopicRevision`, `helpLevelCapture`, `takeawayField`, `curriculumV2`, `spiralPasses`) live? The only "preferences" today are the frontend's localStorage settings (`useAppPreferences`), which the backend cannot read, and the backend has no flags. Several flags change backend behavior (P4.3 stops the revision deferral write; P4.1's FSRS urgency feeds P3.4 ranking). Proposed default: read them in `loadConfig` from `.env` as `FLAG_<NAME>=true|false` (the existing config system, not a new one), **off** when unset so the live app is unchanged after merge, **on** in the overhaul worktree's `.env`, and expose them read-only at `GET /api/flags` for the dashboard. Asked 2026-10-24. Runs waiting: 0
 ## Answered
+- [Q-flags] → `FLAG_<NAME>=true|false` in `.env`, read by `loadConfig` into `AppConfig.flags`, off when unset, on in the overhaul worktree's `.env`, read-only at `GET /api/flags`. Answered 2026-10-24.
+- [Q-health-test] → Yes, fix it (temp DB path). Done 2026-10-24.
+- [D5] → Flashcard warm-up on Today is optional and off by default (the default). Answered 2026-10-24.
 - [D8] → 1 re-solve per day on Today (the default). Answered 2026-10-24.
 - [Today layout] → Re-solves appear as the first, marked row of the Suggested problems list and log through the same Start → timer → ✓ Done → MistakeCapture flow. The separate Re-solve section, topic Revision column and FocusCard are hidden behind flags. Decided 2026-10-24; recorded in the design doc §3.3 and plan P4.2, P5.2, P5.4.
 - [D10] → Yes. A cloud run that is fast-forward with `origin/overhaul` but not checked out as `overhaul` should switch to `overhaul` and continue. Answered 2026-10-19.
