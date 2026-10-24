@@ -252,8 +252,9 @@ Target model, with one job each:
 - One backend endpoint (for example `GET /today/plan`) returns an ordered list of blocks, built by `FocusPlanner`:
   1. *(optional)* warm-up flashcards
   2. **Re-solve**: at most 1 due FSRS problem, the most overdue first, preferring patterns other than today's primary topic
-  3. **Progression**: 1–2 problems from the primary topic at stage-appropriate difficulty
-- Each block carries `problemId`, kind, estimated minutes, and a `reason` string ("hit wrong-approach on Oct 2, due today").
+  3. **Progression**: 1–2 problems at stage-appropriate difficulty. On a **block day** (a new pattern's short block is in progress, §6.2) these come from that pattern. On a **mixed day** they come from covered patterns: remaining pass-1 problems, plus at most 1 unseen problem from a pattern already at pass 1 as a cold transfer check (§6.3).
+- The queue carries a `dayKind` (`block` | `mixed`). Every block carries `revealPattern: boolean`: true only for the current block's own problems. Re-solves and mixed rows are false, and the API must not send their topic name to Today until the attempt is done (§6.4). Until P7.4 lands, every day is a block day for the P3.4 primary topic, which is today's behavior.
+- Each block carries `problemId`, kind, estimated minutes, and a `reason` string ("needed help on Oct 2 · due today"). A reason for a hidden-pattern row never names the pattern or a pattern-specific mistake.
 - Keep the existing re-entry mode (≥ 3-day gap → one 20-minute Easy, no backlog) and catch-up compression rules.
 - A `decision` object explains the day: primary topic, stage, progress in pattern, and why.
 - P1.3 (`verification.md`, P1.3 section): the queue must be the only list of problems on Today (duplicates D1–D4). Invalidate the cached plan on `"resolve"` events too, so a skipped re-solve leaves Today at once. Build the plan once per poll, not also inside `/api/analytics/dashboard`.
@@ -261,10 +262,12 @@ Target model, with one job each:
 **P5.2 Render the queue in the Suggested problems list** · S · depends P5.1
 - Decided with Santosh (2026-10-24): the queue renders in the existing Suggested problems section, which he likes; no new FocusCard surface. The re-solve block is the first row, marked as a re-solve with a small label in the existing type voices and a hairline (for example `RE-SOLVE · due since Oct 2`) plus its `reason`; no new colors, badges or pills. Progression rows below keep today's look. The FocusCard is hidden; its reasoning and week progress move into the P5.3 banner. See `docs/design-taste-and-preferences.md` §3.3.
 - Each block has **Start** (timer), **✓ Done** (opens the unified completion flow), and **Coach ↗**. Completing a block advances the queue in place. No scrolling, no hunting.
+- Header (decided with Santosh 2026-10-25, §6.4): on a block day the hero shows the pattern name exactly as Today does now. On a mixed day it shows its own header, `Mixed practice · N problems · ~M min`, and names no pattern. Rows with `revealPattern: false` show only the problem name, difficulty and the reason. Coach ↗ on a hidden row must not put the pattern name in the coach prompt before the attempt is done.
 
 **P5.3 Stats strip and decision banner** · S · depends P5.1
 - Strip: topics touched / total; problems attempted, clean solved, and in re-solve cycle; sessions this week / target 5; current tier and stage.
 - Banner: the `decision` text plus a "Switch pattern" override, which creates a pin (with P3.3 expiry).
+- On a mixed day neither the strip nor the banner names today's patterns (§6.4). Show overall progress instead (patterns at each pass, sessions this week), and keep the per-pattern detail on the Graph and Re-solve tabs.
 
 **P5.4 Remove duplicate surfaces from Today** · S · depends P5.2, P5.3
 - Behind `todayQueueV2`: the Suggested problems list becomes the queue (P5.2). Hide the collapsed `ResolveTodaySection`, the `FocusCard`, and (with `hideTopicRevision`) the topic Revision column and post-solve revision offer. The full pools stay on their own tabs. Today = banner, strip, queue list, Up next.
@@ -276,6 +279,8 @@ Target model, with one job each:
 - MistakeCapture gets a 4-option tap row: **None / Hint / Approach / Full solution**, plus a source (In-app coach / External AI / Other).
 - Store it with a reversible migration. Keep the old boolean derived (`help > None`) for backward compatibility. Feed help level into the P4.2 rating inference and the confidence updates. "Approach" and "Full solution" weigh more than "Hint".
 - Flag `helpLevelCapture`.
+- Same tap row, added 2026-10-25 (§6.4): for a hidden-pattern row, MistakeCapture first asks **"Which pattern did you use?"** (one tap from the patterns already introduced, plus "Not sure"), then reveals the real pattern. Store the guess on the attempt. A correct guess is the recognition signal that pass 3 uses (§6.3).
+- "Clean" everywhere in this plan means: no `wrong-approach` tag and help ≤ Hint.
 
 **P6.2 One-line takeaway field** · S
 - An optional single-line input: "What tripped you up / the invariant". Saved on the attempt. Appended to the problem's Obsidian note when the vault integration is enabled (dev vault only in the worktree). The latest takeaway shows on that problem's re-solve block as a pre-solve reminder.
@@ -284,43 +289,42 @@ Target model, with one job each:
 **P6.3 Sharper mistake tags** · XS
 - Add `greedy-invariant` and `loop-bounds` to the closed vocabulary in `concepts.yaml`, and make sure `FocusPlanner` CHECKLISTS tags and the teaching-strategy tags match (Gemini flagged a mismatch). Single source of truth for tags.
 
-**P6.4 Pre-solve pattern gate (optional)** · S · 🔶 Santosh decides (default: build it, flag off)
-- For Greedy and Backtracking problems, show a 30-second prompt before the timer: "1. Sort key or state tree? 2. Loop boundary?" Answers are saved with the attempt.
+**P6.4 Pre-solve pattern gate** · **dropped** (D6, Santosh 2026-10-25: over-engineering). Do not build.
 
-### Phase 7 — Spiral multi-pass curriculum (#9, rest of #6)
+### Phase 7 — Two-loop curriculum with spaced passes (#9, rest of #6)
 
-**Behind `curriculumV2` and `spiralPasses`.** Start simple and extend only if needed.
+**Behind `curriculumV2` and `spiralPasses`.** Redesigned 2026-10-25 from Santosh's own approach and the research in §6. Read §6 before any Phase 7 task. Start simple and extend only if needed.
 
-**P7.1 Tier ordering of all 50 topics** · S · 🔶 Santosh decides
-- Produce `docs/plans/topic-tiers.md`, mapping every Notion topic to a tier, starting from the proposal below and the existing `GRAPH_TOPIC_PREREQUISITES`. **Stop and ask Santosh to approve it in `QUESTIONS.md`** before P7.3. Default (used after 3 unanswered runs):
-  - Tier 1: Arrays, Hashing, Two Pointers, Sliding Window, Prefix Sum, Binary Search
-  - Tier 2: Fast & Slow Pointers, Linked Lists, Stack / Monotonic Stack, Greedy Sorting
-  - Tier 3: BFS, DFS, Trees, Heaps / Top-K, Recursion & Backtracking
-  - Tier 4: Graphs, Union-Find, Tries, DP 1D / 2D
-  - Tier 5: compound and advanced topics (for example Binary Search + Greedy, DP on Strings)
+**P7.1 Introduction order and hard prerequisites for all 50 topics** · S · 🔶 Santosh approves (D7)
+- Produce `docs/plans/topic-tiers.md` with two things for every Notion topic (the 50 real names, not the generic list):
+  1. A **priority order for introducing** patterns (what to start next). This is not a gate. Start from Santosh's direction: early exposure to Greedy and DP is wanted, and the basics (Two Pointers, Sliding Window, Hashing, Fast & Slow, Stack, Binary Search) are already familiar enough to consolidate later.
+  2. A short list of **hard prerequisites**: only where a pattern is built from another (for example Recursion & Backtracking → DP topics; BFS / DFS → Topological Sort, Dijkstra, Union-Find, MST; Heap → Top-K, Greedy with Heap; Binary Search → Binary Search + Greedy / + Prefix Sum / on Matrix). Everything else has none.
+- **Stop and ask Santosh to approve it in `QUESTIONS.md`** before P7.4. Default after 3 unanswered runs: the agent's proposal.
 
 **P7.2 Promote prerequisites to a shared DAG** · S · depends P7.1
-- Move prerequisite data out of the visualization-only `graph-edges.ts` into a shared module consumed by both the graph view and the curriculum. Validate it as acyclic in a test. Populate the `prerequisites` column, or derive it, with one source of truth.
+- Move prerequisite data out of the visualization-only `graph-edges.ts` into a shared module consumed by both the graph view and the curriculum. Its edges are the P7.1 hard prerequisites. Validate it as acyclic in a test. One source of truth.
 
-**P7.3 Pass tracking per topic** · S · depends P3.1
-- Pure function: `topicPass(topic, attempts)` →
-  - `0` untouched
-  - `1` foundation (D3 answered 2026-10-24, replaces the flat quota): if the topic has fewer than 4 problems, all of them covered; otherwise all Easy covered **and** at least `min(3, #Medium)` Medium covered. "Covered" is the P3.1 definition.
-  - `2` consolidated: ≥ **7** covered (or all Easy and Medium covered) **and** ≥ 2 clean cold solves (no wrong-approach, help ≤ Hint) (🔶 gate; default count + clean-solve)
-  - `3` mastered: confidence ≥ 70, assist < 25%, and no overdue re-solves
-- Tests for each boundary.
+**P7.3 Pass tracking per topic** · S · depends P3.1, P6.1
+- Pure function `topicPass(topic, attempts, reviews)` → (decided 2026-10-25, D4; §6.3). "Covered" is the P3.1 definition; "clean" is no wrong-approach and help ≤ Hint (P6.1; before P6.1 lands, use the coach flag as help > None).
+  - `0` untouched.
+  - `1` **exposure** (D3): if the topic has fewer than 4 problems, all of them covered; otherwise all Easy covered **and** at least `min(3, #Medium)` Medium covered.
+  - `2` **consolidated**: pass 1, **and** every problem in the topic that was solved with help (or not clean) has since had a clean cold solve in a *later* session (a re-solve), **and** at least `min(2, unseen Easy/Medium left)` problems first attempted after pass 1 were solved clean on the first try. A topic with no unseen problems left skips that last part. No fixed problem count.
+  - `3` **retained**: pass 2, **and** at least 2 hidden-pattern attempts on this topic where the pattern guess was right and the solve was clean, **and** no overdue re-solves. Hards count toward pass 3 only; they are never required for passes 1–2.
+- Keep performance and evidence separate (§6.3): expose the clean-solve rate and the number of cold attempts, not one blended score.
+- Tests for each boundary, including a 2-problem topic, a topic with no Easy, and a topic where every remaining problem is Hard.
 
-**P7.4 Spiral selector** · M · depends P7.2, P7.3, P3.4
-- Next-topic rule, as a pure engine:
-  1. Within the current tier, rotate breadth-first: take the next topic at pass 0 and serve it to pass 1.
-  2. When every topic in the tier is at pass ≥ 1, look at the next tier's topics. For any candidate whose prerequisites need pass 2, **spiral back** to the lowest-pass prerequisite and serve problems until it reaches pass 2.
-  3. **Consolidation day:** if a covered topic has ≥ 2 overdue re-solves, today's primary topic becomes that topic.
-  4. A manual pin (P3.3) overrides all of the above.
-- Emits the `decision` reason for the Today banner, for example: "Pass 2: Two Pointers, 2 problems left to unlock Binary Search + Greedy."
-- *Acceptance:* scenario tests that reproduce Santosh's A→B→C→D→(back to A–D)→E/F walkthrough exactly.
+**P7.4 Two-loop selector** · M · depends P7.2, P7.3, P3.4
+- Pure engine. Each day it returns `dayKind` and the progression picks for P5.1:
+  1. A manual pin (P3.3) overrides everything; a pinned topic is served as a block.
+  2. **Consolidation day:** if a covered topic has ≥ 2 overdue re-solves, today is a mixed day led by that topic's re-solves (pattern still hidden).
+  3. **Exposure loop:** if fewer than 3 patterns are introduced but below pass 1, start the next pattern in the P7.1 order whose hard prerequisites are at pass ≥ 1. Its **short block** is its first 2–4 problems (Easy first, then Medium), served on block days with the pattern shown (§6.2). When the block is done, its remaining pass-1 problems join the mixed pool.
+  4. Otherwise a **mixed day**: remaining pass-1 problems from introduced patterns, plus at most 1 unseen problem from a pattern at pass ≥ 1 (the transfer check), all hidden.
+  5. **Consolidation loop:** once the core patterns in the P7.1 order are all at pass ≥ 1, step 3 stops introducing and mixed days favor the lowest-pass topics, starting with the basics, until they reach pass 2. A topic whose hard prerequisite is below pass 2 sends you back to that prerequisite first.
+- Emits the `decision` reason for the banner. On a mixed day it must not name today's patterns (§6.4), for example "Mixed practice: 3 patterns still need a clean cold solve."
+- *Acceptance:* scenario tests covering a block running to completion, the switch to mixed days, the 3-open-pattern cap, a consolidation day, a prerequisite send-back, and the move into the consolidation loop.
 
 **P7.5 Wire into PlanService behind the flag; compare old vs new** · S · depends P7.4
-- With `curriculumV2` off, use P3.4 behavior. With it on, use the spiral selector. Add `pnpm dev:simulate-plan --days 14`, which prints both selectors' picks for the dev DB, for Santosh to eyeball.
+- With `curriculumV2` off, use P3.4 behavior. With it on, use the two-loop selector. Add `pnpm dev:simulate-plan --days 14`, which prints both selectors' picks and each day's `dayKind` for the dev DB, for Santosh to eyeball.
 
 ### Phase 8 — Merge readiness
 
@@ -344,18 +348,20 @@ Agents copy these into `QUESTIONS.md` on day 1. Defaults apply only after 3 unan
 | D1 | Branch `overhaul` from the WIP commit (`wip/focus-planner`) or from `main`? | WIP |
 | D2 | Pin auto-expiry duration | 14 days (answered 2026-10-24: 7 days) |
 | D3 | Pass 1 quota per pattern (3 / 4 / 5) | 4 (answered 2026-10-24: difficulty-aware rule, see P7.3) |
-| D4 | Pass 2 gate: count only, or count + ≥ 2 clean cold solves | count + clean |
-| D5 | Flashcard warm-up on Today: off / optional / always | optional, off |
-| D6 | Build the pre-solve pattern gate? | build, flag off |
-| D7 | Approve the topic tiers in `topic-tiers.md` | proposal in P7.1 |
+| D4 | Pass 2 gate: count only, or count + ≥ 2 clean cold solves | count + clean (answered 2026-10-25: spaced clean re-solves + transfer, no fixed count; see P7.3, §6.3) |
+| D5 | Flashcard warm-up on Today: off / optional / always | optional, off (answered 2026-10-24: optional, off) |
+| D6 | Build the pre-solve pattern gate? | build, flag off (answered 2026-10-25: no, dropped) |
+| D7 | Approve the introduction order and hard prerequisites in `topic-tiers.md` (redefined 2026-10-25) | proposal in P7.1 |
 | D8 | Max re-solves on Today per day | 1 (answered 2026-10-24: 1) |
 | D9 | Allow Notion **reads** in the worktree (needed if 50-topic data isn't fully in the dev DB) | no; use dev DB only |
+| D11 | Short block size for a new pattern | answered 2026-10-25: 2–4 problems |
+| D12 | Mixed-day composition | answered 2026-10-25: 1 re-solve + 1–2 problems, with at most 1 unseen transfer-check problem |
 
 ---
 
 ## 5. Expected pace and weekly review
 
-About 30 tasks, roughly **5–6 weeks** at one task per day. Phases 0–3 (the critical bug fixes) should land in about week 1–2.
+About 30 tasks, roughly **5–6 weeks** at one task per day (19 left on 2026-10-25, P6.4 dropped). Phases 0–3 (the critical bug fixes) should land in about week 1–2.
 
 **Weekly review checklist for Santosh (≈ 20 min):**
 1. Read `PROGRESS.md` entries since the last review and answer anything in `QUESTIONS.md`.
@@ -363,6 +369,43 @@ About 30 tasks, roughly **5–6 weeks** at one task per day. Phases 0–3 (the c
 3. Run the worktree app (`pnpm dev` on the overhaul ports) and click through Today once.
 4. Run `pnpm dev:metrics` and compare against `baseline-metrics.md`.
 5. Correct course by editing this plan; agents follow the plan as written.
+
+---
+
+## 6. Learning model (decided 2026-10-25)
+
+Agreed with Santosh after a research pass. Phases 5–7 implement it. Where a task and this section disagree, this section wins; note the conflict in PROGRESS.md.
+
+### 6.1 Research basis
+- **Mixed practice trains pattern recognition.** In a 9-week classroom study, interleaved maths practice scored about 72% on a delayed test against about 38% for blocked practice (d = 1.05). The mechanism: blocked practice tells you the strategy, so you never practise choosing it. A 59-study meta-analysis finds a moderate overall benefit (g = 0.42), smaller and less consistent for maths-type tasks (g = 0.34), and largest when categories look alike, which fits DSA patterns. Learners nearly always *feel* blocked practice is better; 87% did in one study even when tests showed otherwise.
+- **Beginners need a short block first.** The expertise-reversal research: worked examples and similar problems back to back help novices, and the same support becomes redundant once the pattern is known. Mixing pays off once the patterns can be told apart.
+- **Early struggle is fine; shallow coverage is not.** Productive-failure work supports attempting problems before feeling ready. The main criticism of spiral curricula is "a mile wide and an inch deep": revisits stacked on weak foundations. Real prerequisites still matter; a fixed topic order has no evidence behind it.
+- **Spaced cold success beats finishing a topic.** Successive relearning: recalling an item once in each of 3 spaced sessions gave 68% one-week retention, against 26% for 3 recalls in one session. A randomised ALEKS study found a higher mastery bar cost about 30% more time for a small retention gain that faded. Mastery research recommends tracking performance and amount of evidence separately.
+- **Help changes what counts.** In the ALEKS study the higher bar mattered most when the learner had viewed an explanation.
+- **Data fit.** The dev DB has 286 problems (52 Easy, 183 Medium, 51 Hard); the median topic has 5 problems and only 19 of 50 have 7 or more, so pass rules scale per topic.
+- **Limits.** Most evidence is from maths, physics and category learning, not DSA; no study compares DSA curricula. Sources: Brunmair & Richter 2019 (Psychological Bulletin); Rohrer, Dedrick & Burgess 2014; Yan & Sana 2021; Rawson & Dunlosky successive-relearning review (Current Directions, 2022); ALEKS mastery-threshold experiment (JEDM); Pelánek, conceptual issues in mastery criteria; Cepeda et al. 2008; Sinha & Kapur 2021.
+
+### 6.2 Order of learning: two loops
+- **Exposure loop.** Move through the core patterns, Greedy and DP included, without waiting to perfect the basics. Each new pattern gets a **short block of 2–4 problems** with its name shown. After that it only comes back mixed.
+- **Consolidation loop.** Return to the basics and deepen them, bringing Greedy and DP thinking along, then the other patterns, until each reaches pass 2.
+- **Tiers are only an introduction order**, never a gate. A pattern waits only on its hard prerequisites (P7.1).
+
+### 6.3 Passes (per topic)
+| Pass | What it takes |
+|---|---|
+| 1 Exposure | All Easy plus up to 3 Medium, or everything if the topic has fewer than 4 problems |
+| 2 Consolidated | Problems needing help re-solved clean in a later session, plus up to 2 unseen problems solved clean first try |
+| 3 Retained | Recognised and solved clean when hidden in mixed practice (2+ times), Hards, no overdue re-solves |
+
+"Clean" = no wrong-approach and help ≤ Hint. Exact rules in P7.3.
+
+### 6.4 Today page
+- **Block day:** the hero shows the pattern name as it does now.
+- **Mixed day:** its own header, `Mixed practice · N problems · ~M min`, no pattern names.
+- **Re-solves and mixed rows** never show their pattern before Done: only the problem, difficulty and a reason that doesn't name the pattern ("needed help on Oct 2 · due today").
+- **After ✓ Done** on a hidden row: "Which pattern did you use?" (one tap), then the real pattern is revealed (P6.1).
+- **Strip and banner** never name today's patterns on a mixed day (P5.3).
+- **Accepted leaks:** LeetCode's own Topics tags (don't expand them) and titles that give the pattern away.
 
 ---
 

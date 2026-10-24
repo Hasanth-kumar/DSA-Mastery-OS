@@ -1,10 +1,13 @@
 # Questions for Santosh
 ## Open
-- [D4] Pass 2 gate: count only, or count + ≥ 2 clean cold solves — default count + clean. Asked 2026-10-19. Runs waiting: 0
-- [D6] Build the pre-solve pattern gate? — default build, flag off. Asked 2026-10-19. Runs waiting: 0
-- [D7] Approve the topic tiers in `topic-tiers.md` — default proposal in P7.1. Asked 2026-10-19. Runs waiting: 0
 - [D9] Allow Notion reads in the worktree — default no; use dev DB only. Asked 2026-10-19. Runs waiting: 0
 ## Answered
+- [D4] → No fixed count. Pass 2 = every problem that needed help re-solved clean in a later session, plus up to 2 unseen problems solved clean first try. Answered 2026-10-25 with the learning model in plan §6; rules in P7.3.
+- [D6] → Dropped. Santosh: over-engineering. P6.4 is not built. Answered 2026-10-25.
+- [D7] → Redefined 2026-10-25: tiers are only an introduction order plus a short list of hard prerequisites (plan P7.1, §6.2). The agent asks for approval of `topic-tiers.md` when P7.1 produces it.
+- [D11] → Short block for a new pattern: 2–4 problems, pattern shown. Answered 2026-10-25.
+- [D12] → Mixed days: 1 re-solve + 1–2 problems, at most 1 of them an unseen transfer-check problem; all with the pattern hidden. Answered 2026-10-25.
+- [Today header] → Block days keep the current pattern-name header; mixed days get their own `Mixed practice` header and name no pattern. Decided 2026-10-25 (design doc §3.3, plan §6.4).
 - [Q-flags] → `FLAG_<NAME>=true|false` in `.env`, read by `loadConfig` into `AppConfig.flags`, off when unset, on in the overhaul worktree's `.env`, read-only at `GET /api/flags`. Answered 2026-10-24.
 - [Q-health-test] → Yes, fix it (temp DB path). Done 2026-10-24.
 - [D5] → Flashcard warm-up on Today is optional and off by default (the default). Answered 2026-10-24.

@@ -27,7 +27,7 @@
 | P6.1 | todo | | |
 | P6.2 | todo | | |
 | P6.3 | todo | | |
-| P6.4 | todo | | |
+| P6.4 | dropped | | D6: not built |
 | P7.1 | todo | | |
 | P7.2 | todo | | |
 | P7.3 | todo | | |
@@ -38,6 +38,12 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-25 — Learning model for Phases 5–7 (docs only)
+- Did: Santosh asked for research on topic ordering and pass rules, then agreed a design. New plan §6 "Learning model" (research basis with sources, two loops, passes, Today rules). Rewrote Phase 7 (P7.1 introduction order + hard prerequisites, P7.3 spaced-pass rules, P7.4 two-loop selector), added `dayKind` / `revealPattern` to P5.1, the block-day / mixed-day header to P5.2, a no-leak rule to P5.3, and the pattern-guess tap to P6.1. P6.4 dropped (D6). D4, D6, D7, D11, D12 recorded. Design doc §3.3 and §3.4 updated.
+- Tests: docs only; none run.
+- Data check: per-topic problem counts from a read-only copy of the dev DB: 286 problems (52 Easy, 183 Medium, 51 Hard), median 5 per topic, 19 of 50 topics with 7 or more. That is why passes no longer use fixed counts.
+- Next suggested task: P4.3.
+
 ### 2026-10-24 — P4.1 Replacement signals for decisions that read SM-2
 - Santosh answered three questions at the start of this session: [Q-flags] → `FLAG_<NAME>` in `.env`, off when unset; [Q-health-test] → fix it; [D5] → warm-up optional and off by default.
 - Did, prerequisites: **flags** (commit `2b1aedb`). `loadConfig` reads `FLAG_TODAY_QUEUE_V2`, `FLAG_UNIFIED_COMPLETION`, `FLAG_HIDE_TOPIC_REVISION`, `FLAG_HELP_LEVEL_CAPTURE`, `FLAG_TAKEAWAY_FIELD`, `FLAG_CURRICULUM_V2`, `FLAG_SPIRAL_PASSES` into `AppConfig.flags` (all off when unset; empty counts as unset). `GET /api/flags` returns them read-only. Listed in `infrastructure/.env.example`; all seven set to `true` in the overhaul worktree's local `.env`. **Health test** (commit `12c98ff`): `health.test.ts` now pins `SQLITE_PATH` and `DSA_DB_PATH` to a temp file; `pnpm test` no longer creates `data/sqlite/dsa.db`.
