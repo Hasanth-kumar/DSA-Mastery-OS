@@ -234,7 +234,7 @@ Target model, with one job each:
 
 **P4.2 One completion flow for new problems and re-solves** · M (split: backend, then UI) · depends P3.2
 - *Backend:* a single "complete attempt" service path that handles both kinds. It infers the FSRS rating from solve time versus the target (25 / 45 / 75 min for E/M/H), help level, and mistake tags, so no manual rating is needed. A problem that was hard or needed help enters or updates `problem_reviews`. A clean, fast cold solve extends its interval and can eventually retire it.
-- *UI:* `ResolveCompleteForm` is replaced by the same Done → MistakeCapture flow (flag `unifiedCompletion`).
+- *UI:* `ResolveCompleteForm` is replaced by the same Done → MistakeCapture flow (flag `unifiedCompletion`). Santosh's requirement (2026-10-24): a re-solve logs exactly like a new problem on Today — Start opens the LeetCode tab and starts the timer, the time runs until ✓ Done, then MistakeCapture flags mistakes. No outcome picker.
 - *Acceptance:* tests for rating inference across the matrix (fast and clean → Easy/Good; slow or heavy help → Hard/Again).
 
 **P4.3 Hide the topic Revision column and the post-solve revision popup** · XS · depends P4.1
@@ -256,7 +256,8 @@ Target model, with one job each:
 - A `decision` object explains the day: primary topic, stage, progress in pattern, and why.
 - P1.3 (`verification.md`, P1.3 section): the queue must be the only list of problems on Today (duplicates D1–D4). Invalidate the cached plan on `"resolve"` events too, so a skipped re-solve leaves Today at once. Build the plan once per poll, not also inside `/api/analytics/dashboard`.
 
-**P5.2 Actionable FocusCard** · S · depends P5.1
+**P5.2 Render the queue in the Suggested problems list** · S · depends P5.1
+- Decided with Santosh (2026-10-24): the queue renders in the existing Suggested problems section, which he likes; no new FocusCard surface. The re-solve block is the first row, marked as a re-solve with a small label in the existing type voices and a hairline (for example `RE-SOLVE · due since Oct 2`) plus its `reason`; no new colors, badges or pills. Progression rows below keep today's look. The FocusCard is hidden; its reasoning and week progress move into the P5.3 banner. See `docs/design-taste-and-preferences.md` §3.3.
 - Each block has **Start** (timer), **✓ Done** (opens the unified completion flow), and **Coach ↗**. Completing a block advances the queue in place. No scrolling, no hunting.
 
 **P5.3 Stats strip and decision banner** · S · depends P5.1
@@ -264,7 +265,7 @@ Target model, with one job each:
 - Banner: the `decision` text plus a "Switch pattern" override, which creates a pin (with P3.3 expiry).
 
 **P5.4 Remove duplicate surfaces from Today** · S · depends P5.2, P5.3
-- Behind `todayQueueV2`: hide the standalone `Suggested problems` list and the collapsed `ResolveTodaySection` (the full pools stay on their own tabs). Today = strip, banner, queue.
+- Behind `todayQueueV2`: the Suggested problems list becomes the queue (P5.2). Hide the collapsed `ResolveTodaySection`, the `FocusCard`, and (with `hideTopicRevision`) the topic Revision column and post-solve revision offer. The full pools stay on their own tabs. Today = banner, strip, queue list, Up next.
 - *Acceptance:* every problem appears at most once on Today. Visual check against the design-taste doc (canvas-first, hairline separators, no boxed cards).
 
 ### Phase 6 — Better signals: help capture and reflection (#4, #5)
@@ -345,7 +346,7 @@ Agents copy these into `QUESTIONS.md` on day 1. Defaults apply only after 3 unan
 | D5 | Flashcard warm-up on Today: off / optional / always | optional, off |
 | D6 | Build the pre-solve pattern gate? | build, flag off |
 | D7 | Approve the topic tiers in `topic-tiers.md` | proposal in P7.1 |
-| D8 | Max re-solves on Today per day | 1 |
+| D8 | Max re-solves on Today per day | 1 (answered 2026-10-24: 1) |
 | D9 | Allow Notion **reads** in the worktree (needed if 50-topic data isn't fully in the dev DB) | no; use dev DB only |
 
 ---
