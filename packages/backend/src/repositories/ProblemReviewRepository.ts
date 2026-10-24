@@ -75,6 +75,17 @@ export class ProblemReviewRepository {
     return this.findById(problemId)!;
   }
 
+  /**
+   * Remove a pool row only if it was never reviewed (P3.2 revert). Returns
+   * whether a row was deleted; a row with review history is kept.
+   */
+  deleteIfUntouched(problemId: string): boolean {
+    const row = this.findById(problemId);
+    if (!row || row.reps > 0 || row.lastReview != null) return false;
+    this.db.delete(problemReviews).where(eq(problemReviews.problemId, problemId)).run();
+    return true;
+  }
+
   update(problemId: string, patch: ProblemReviewPatch): ProblemReviewRow {
     this.db
       .update(problemReviews)

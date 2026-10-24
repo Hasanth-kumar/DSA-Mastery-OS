@@ -10,6 +10,8 @@ import type { TopicDifficulty } from "../types.js";
 
 const MS_PER_DAY = 86_400_000;
 
+const DAY_MS = 86_400_000;
+
 export interface ProblemReviewConfig {
   /** Admission slow-solve cutoffs in minutes (§4). Match the 0016 backfill. */
   slowThresholdMin: Record<TopicDifficulty, number>;
@@ -45,6 +47,24 @@ export interface AttemptSignal {
 }
 
 /** Maps 1:1 onto ts-fsrs Again/Hard/Good/Easy in the backend wrapper. */
+/** A problem considered for the P3.2 pool backfill. */
+export interface RevisionNeededCandidate {
+  problemId: string;
+  status: string | null;
+  difficulty: TopicDifficulty | null;
+  /** Already has a `problem_reviews` row (retired rows count). */
+  inPool: boolean;
+  attempts: AttemptSignal[];
+  /** Latest attempt or problem update, ms; oldest is scheduled first. */
+  lastActivityAt: number | null;
+}
+
+export interface PoolBackfillItem {
+  problemId: string;
+  reason: AdmissionReason;
+  due: number;
+}
+
 export type ResolveRating = "again" | "hard" | "good" | "easy";
 
 /** A completed re-solve, as reported by the completion flow (§5). */
@@ -101,6 +121,35 @@ export class ProblemReviewEngine {
     if (attempts.some((a) => a.timeTaken != null && a.timeTaken > cutoff)) return "slow";
     if (problem.difficulty === "Hard") return "hard";
     return null;
+  }
+
+  /**
+   * P3.2: every `Revision needed` problem belongs in the re-solve pool. Plans
+   * rows for those missing from it. The reason comes from the attempt history
+   * like normal admission; with no recorded attempts (status set in Notion)
+   * it is "mistake", which is what `Revision needed` records. Due dates are
+   * staggered one per day, oldest activity first, wrapping after
+   * `spreadDays`, so the backfill never lands as a wall of due work.
+   */
+  planRevisionNeededBackfill(
+    candidates: readonly RevisionNeededCandidate[],
+    now: number,
+    config: ProblemReviewConfig = DEFAULT_PROBLEM_REVIEW_CONFIG,
+    spreadDays = 21,
+  ): PoolBackfillItem[] {
+    return candidates
+      .filter((c) => c.status === "Revision needed" && !c.inPool)
+      .slice()
+      .sort(
+        (a, b) =>
+          (a.lastActivityAt ?? 0) - (b.lastActivityAt ?? 0) ||
+          a.problemId.localeCompare(b.problemId),
+      )
+      .map((c, i) => ({
+        problemId: c.problemId,
+        reason: this.shouldAdmit({ difficulty: c.difficulty }, c.attempts, config) ?? "mistake",
+        due: now + (i % Math.max(1, spreadDays)) * DAY_MS,
+      }));
   }
 
   /** Rating inference from measured signals (§5 table); UI may override. */

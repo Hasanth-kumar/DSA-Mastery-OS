@@ -48,6 +48,20 @@ Verify (with the app still stopped):
 pnpm db:repair-schedules              # should now say "Nothing to do"
 ```
 
+## P3.2 — Put every "Revision needed" problem in the re-solve pool
+
+Some problems are marked `Revision needed` (often in Notion) but have no re-solve row, so they never come back for a re-solve. This adds the missing rows. It is local-only: `problem_reviews` never syncs to Notion.
+
+```bash
+pnpm db:backfill-resolve-pool            # dry run: lists the problems it would add
+pnpm db:backfill-resolve-pool --apply    # backs up into data/backups/, then adds them
+pnpm db:backfill-resolve-pool            # should now say "Nothing to do"
+```
+
+What to expect: on the dev DB it added 5 (Maximum Depth of N-ary Tree, Two Sum, Subsets, Subsets II, Maximum Sum Subarray of Size K). Due dates are spread one per day, oldest first, so only one lands today.
+
+Rollback: `pnpm db:backfill-resolve-pool --revert` removes exactly the rows `--apply` added (their ids are recorded in `sync_meta`), except any you have re-solved since.
+
 ## P3.3 — Clear the stale curriculum pin
 
 _Added with P3.3._

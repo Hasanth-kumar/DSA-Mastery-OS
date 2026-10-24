@@ -10,6 +10,7 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "lint": "eslint src",
+    "db:backfill-resolve-pool": "tsx src/scripts/backfill-resolve-pool.ts",
     "db:repair-schedules": "tsx src/scripts/repair-topic-schedules.ts"
   },
   "dependencies": {

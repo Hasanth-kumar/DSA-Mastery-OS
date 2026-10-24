@@ -31,6 +31,7 @@ export {
   ProblemReviewEngine,
   type AdmissionReason,
   type ProblemReviewConfig,
+  type PoolBackfillItem,
   type ProblemReviewState,
   type ResolveRating,
 } from "./problem-review-engine/ProblemReviewEngine.js";

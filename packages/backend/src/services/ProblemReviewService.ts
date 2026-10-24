@@ -1,6 +1,7 @@
 import type {
   AdmissionReason,
   IntelligenceOrchestrator,
+  PoolBackfillItem,
   ProblemReviewConfig,
   ProblemReviewState,
   ResolveRating,
@@ -146,6 +147,53 @@ export class ProblemReviewService {
     this.reviewRepo.admit(problemId, reason, Date.now());
     this.events.publish("resolve");
     return reason;
+  }
+
+  /** P3.2: `Revision needed` problems missing from the pool, with planned rows. */
+  planRevisionNeededBackfill(now = Date.now()): PoolBackfillItem[] {
+    const candidates = this.problemRepo
+      .findAll()
+      .filter((p) => p.status === "Revision needed")
+      .map((p) => {
+        const attempts = this.attemptRepo.findByProblemId(p.id, 50);
+        const lastAttempt = attempts.reduce<number | null>(
+          (max, a) => (a.solvedAt != null && (max == null || a.solvedAt > max) ? a.solvedAt : max),
+          null,
+        );
+        return {
+          problemId: p.id,
+          status: p.status,
+          difficulty: toDifficulty(p.difficulty),
+          inPool: this.reviewRepo.findById(p.id) != null,
+          attempts: attempts.map(toSignal),
+          lastActivityAt: lastAttempt ?? p.updatedAt ?? null,
+        };
+      });
+    return this.engine.planRevisionNeededBackfill(candidates, now, this.cfg);
+  }
+
+  /** Writes planned backfill rows. Skips any problem that joined the pool since planning. */
+  applyRevisionNeededBackfill(items: readonly PoolBackfillItem[], now = Date.now()): string[] {
+    const admitted: string[] = [];
+    for (const item of items) {
+      if (this.reviewRepo.findById(item.problemId)) continue;
+      this.reviewRepo.admit(item.problemId, item.reason, now);
+      this.reviewRepo.update(item.problemId, { due: item.due });
+      admitted.push(item.problemId);
+    }
+    if (admitted.length > 0) this.events.publish("resolve");
+    return admitted;
+  }
+
+  /** Reverts a backfill: removes the listed rows that were never reviewed. */
+  revertRevisionNeededBackfill(problemIds: readonly string[]): { removed: string[]; kept: string[] } {
+    const removed: string[] = [];
+    const kept: string[] = [];
+    for (const id of problemIds) {
+      (this.reviewRepo.deleteIfUntouched(id) ? removed : kept).push(id);
+    }
+    if (removed.length > 0) this.events.publish("resolve");
+    return { removed, kept };
   }
 
   /** Manual force-admit from the UI (§4) — clears retired/suspended, due now. */
