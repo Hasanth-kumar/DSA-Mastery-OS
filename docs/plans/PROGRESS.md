@@ -18,7 +18,7 @@
 | P3.5 | done | bee4035 | stage table replaces confidence gates; slot-based suggestions |
 | P4.1 | done | ca3d565 | FSRS urgency + revision_count behind `hideTopicRevision`; flags in `.env` |
 | P4.2 | todo | | |
-| P4.3 | todo | | |
+| P4.3 | done | edf6d19 | no revision queue, minutes or deferral write; Today hides Revision panel + offer |
 | P4.4 | todo | | |
 | P5.1 | todo | | |
 | P5.2 | todo | | |
@@ -38,6 +38,15 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-25 — P4.3 Hide the topic Revision column and the post-solve revision popup
+- Did: behind `hideTopicRevision`. **Backend** (`PlanService`, flag passed from `context.ts`): the topic revision queue is empty, so `revisionTopics`, `revisionProblems`, `revisionTotalDue` and `revisionDeferred` are empty/0 (F1), the 25 minutes per revision topic drop out of `estimatedDuration` (F2), and the catch-up compression no longer writes `next_revision_at` (F3). Due re-solves are untouched (problem FSRS). **Frontend**: new `api.getFlags()` (`GET /api/flags`, cached 1 h) and a `FeatureFlags` type. Today hides the Revision panel (U1) and skips the revision offer after MistakeCapture (U2). The panel stays hidden until the flags load, so the overhaul build never flashes it; a failed fetch counts as all-off (live behavior). When the right column has nothing left (panel hidden and Up next hidden in focus mode), the left column takes the full width (`today-grid--single`). Hide only: no component or route deleted. The "Recall ≠ execution" chip (U3) is not in P4.3 and stays.
+- Also (commit `ab051e9`): `SessionService.test.ts` built its config from the worktree `.env`, where `FLAG_HIDE_TOPIC_REVISION=true`, so 2 SM-2 warm-up cases failed under `pnpm test` in the worktree (they passed only without a `.env`). It now pins the flags off; the flag-on cases already live in `fsrs-topic-signals.test.ts`.
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ with the worktree `.env` present (shared 23, intelligence 164, integrations 197, backend 127). New `hide-topic-revision.test.ts` (2: flag off keeps the 2-topic queue, 4 due, 2 deferred and moved forward; flag on has empty lists, no `next_revision_at` change on any topic, and 50 fewer minutes). Mutation check: with the flag check removed from `PlanService`, the flag-on test fails; restored. Run on a scratch copy of the worktree on Linux so the macOS `node_modules` stayed untouched.
+- Data check (two scratch copies of the dev DB, `generateTodaysPlan`): flag off → revision topics String Matching, Binary Search; 5 due, 3 deferred, and 3 topics rescheduled by the write (Sorting + Two Pointers, Greedy Sorting, Binary Search + Prefix Sum); 169 min. Flag on → no revision topics, 0 due, 0 deferred, 0 topics rescheduled; 125 min. Re-solve slots 2 in both. `revisionProblems` is 0 in both (those topics have no `Solved` problem). The primary differs (Sliding Window vs DFS) for the P4.1 reason already logged (no current topic stored on the copy), which also accounts for the minutes gap being 44 rather than 50.
+- Design check: hides, adds no component, color, font or shadow; the only CSS is a layout rule for the single-column grid using the existing hairline rules (§2). Fewer things on Today, no backlog count shown (§3, no backlog guilt). Not checked in a browser this session (no browser on the Linux side); worth a look at the weekly review with focus mode on and off.
+- Surprises: any backend test calling `loadConfig()` without a path reads the worktree `.env`, so flag-on defaults can leak into tests written for flag-off behavior. Only `SessionService.test.ts` was affected today; see Ideas.
+- Next suggested task: P4.2 backend (unified completion path).
+
 ### 2026-10-25 — Learning model for Phases 5–7 (docs only)
 - Did: Santosh asked for research on topic ordering and pass rules, then agreed a design. New plan §6 "Learning model" (research basis with sources, two loops, passes, Today rules). Rewrote Phase 7 (P7.1 introduction order + hard prerequisites, P7.3 spaced-pass rules, P7.4 two-loop selector), added `dayKind` / `revealPattern` to P5.1, the block-day / mixed-day header to P5.2, a no-leak rule to P5.3, and the pattern-guess tap to P6.1. P6.4 dropped (D6). D4, D6, D7, D11, D12 recorded. Design doc §3.3 and §3.4 updated.
 - Tests: docs only; none run.
@@ -165,6 +174,7 @@
 - Next suggested task: P0.1
 
 ## Ideas (not scheduled)
+- Make backend tests independent of the worktree `.env` (for example, a vitest setup file that pins `FLAG_*` off, or `loadConfig("/nonexistent/.env")` everywhere). Four other test files still call `loadConfig()` with the default path (P4.3).
 - ~~Default curriculum labels resolve by substring~~ — fixed in P3.4.
 - Treat `"resolve"` events as a plan invalidation in the `context.ts` subscriber, so a skipped or admitted re-solve updates Today immediately (P1.3). Folded into P5.1 unless Santosh wants it sooner.
 - ~~Point `health.test.ts` at a temp DB~~ — done 2026-10-24 ([Q-health-test] answered).
