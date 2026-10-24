@@ -134,7 +134,9 @@ export function TodayPage({ onOpenCoach }: Props) {
   }, [celebrateAt]);
 
   useEffect(() => {
-    const onStart = () => setFlow((f) => (f.kind === "idle" ? { kind: "warmup" } : f));
+    // Same as clicking "Start session" (rendered only while the flow is idle).
+    const onStart = () =>
+      document.querySelector<HTMLButtonElement>("[data-start-session='true']")?.click();
     const onFocusDone = () => {
       document.querySelector<HTMLButtonElement>("[data-done-button='true']")?.focus();
     };
@@ -241,6 +243,22 @@ export function TodayPage({ onOpenCoach }: Props) {
     } finally {
       setLogging(null);
     }
+  };
+
+  // P4.4 (D5): with `todayQueueV2` the flashcard warm-up is opt-in — "Start
+  // session" goes straight to the first problem; "Warm up first" is a quiet link.
+  const warmupOptIn = flags?.todayQueueV2 === true;
+  const beginSession = (withWarmup: boolean) => {
+    setCelebrateAt(null);
+    setWarmupGraded(false);
+    if (withWarmup) {
+      setFlow({ kind: "warmup" });
+      return;
+    }
+    const first = plan?.suggestedProblems[0];
+    if (!first || starts[first.problemId]) return;
+    if (first.leetcodeLink) window.open(first.leetcodeLink, "_blank", "noopener,noreferrer");
+    startProblem(first.problemId);
   };
 
   // P4.2 (`unifiedCompletion`): a re-solve logs like a new problem — Start opens
@@ -507,11 +525,8 @@ export function TodayPage({ onOpenCoach }: Props) {
                     <button
                       type="button"
                       className="btn-primary-v2"
-                      onClick={() => {
-                        setCelebrateAt(null);
-                        setWarmupGraded(false);
-                        setFlow({ kind: "warmup" });
-                      }}
+                      data-start-session="true"
+                      onClick={() => beginSession(!warmupOptIn)}
                     >
                       <svg viewBox="0 0 16 16" width="13" height="13" fill="currentColor">
                         <path d="M4 2.5v11l9-5.5z" />
@@ -522,12 +537,25 @@ export function TodayPage({ onOpenCoach }: Props) {
                   <button type="button" className="btn-secondary-v2" onClick={() => void toggleExplain()}>
                     {showExplain ? "Hide" : "Why this?"}
                   </button>
-                  <div className="warmup-queue-hint">
-                    <span className="warmup-queue-dots" aria-hidden>
-                      <span /><span /><span />
-                    </span>
-                    3 warm-up cards queued
-                  </div>
+                  {warmupOptIn ? (
+                    flow.kind === "idle" && (
+                      <button
+                        type="button"
+                        className="today-show-more-link"
+                        style={{ marginTop: 0 }}
+                        onClick={() => beginSession(true)}
+                      >
+                        Warm up first · 3 cards
+                      </button>
+                    )
+                  ) : (
+                    <div className="warmup-queue-hint">
+                      <span className="warmup-queue-dots" aria-hidden>
+                        <span /><span /><span />
+                      </span>
+                      3 warm-up cards queued
+                    </div>
+                  )}
                 </div>
                 {showExplain && (
                   <div className="today-explain" style={{ marginTop: "1rem" }}>
