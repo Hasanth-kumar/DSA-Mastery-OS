@@ -17,9 +17,9 @@
 | P3.4 | done | 4336eb3 | pin > current topic > highest-priority ready topic; label + edge matching fixed |
 | P3.5 | done | bee4035 | stage table replaces confidence gates; slot-based suggestions |
 | P4.1 | done | ca3d565 | FSRS urgency + revision_count behind `hideTopicRevision`; flags in `.env` |
-| P4.2 | todo | | |
+| P4.2 | done | fce0b86, 74d3db0 | a: one completion path + inferred rating; b: Today re-solve rows use Start → Done → MistakeCapture |
 | P4.3 | done | edf6d19 | no revision queue, minutes or deferral write; Today hides Revision panel + offer |
-| P4.4 | todo | | |
+| P4.4 | done | 93395ba | warm-up opt-in behind `todayQueueV2` |
 | P5.1 | todo | | |
 | P5.2 | todo | | |
 | P5.3 | todo | | |
@@ -38,6 +38,23 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-25 — P4.4 Demote flashcards from the hot path
+- Did: no flag was named for this, so it sits behind `todayQueueV2` (the Today flag; on here, off on live). With it on, "Start session" (and the `dsa:start-session` shortcut) opens the first suggested problem on LeetCode and starts its timer; the warm-up is a quiet `Warm up first · 3 cards` link in the hero that opens the same `WarmupCard`. Flag off: unchanged. Review tab unchanged.
+- Tests: no frontend tests exist; `pnpm build` ✅ `pnpm lint` ✅.
+- Design check: no new component or style; the link reuses `.today-show-more-link`. Fewer steps before problem-solving (§3, protect problem-solving time). Checked in a browser (see the P4.2 entry for how): idle hero, after Start session (row 01 active with its timer), and after Warm up first (warm-up card).
+- Note: after Start session the button stays visible (as it did after a warm-up before); pressing it again does nothing. Phase 5 rebuilds the hero.
+- Next suggested task: P5.1.
+
+### 2026-10-25 — P4.2 One completion flow for new problems and re-solves (backend + UI)
+- Did, backend (`fce0b86`): new pure rule `ProblemReviewEngine.inferCompletionRating` — `could-not-solve`, or help plus a missing approach (`wrong-approach` / `pattern-recall`) → Again; help, a missing approach, or slower than the target (`slowThresholdMin`, 25 / 45 / 75) → Hard; only detail slips (edge case, off-by-one) or untimed → Good; clean within the target → Good; clean within half the target → Easy. With `unifiedCompletion` on, logging a problem that is in the pool and not retired (`POST /api/session`) records a `resolve` attempt and calls `ProblemReviewService.completeAttempt`, which rates and reschedules it at ✓ Done and saves the pre-attempt FSRS row in `sync_meta` (`resolve_pre:<attemptId>`). `PATCH /api/attempts/:id/mistake` redoes the rating from that saved row once tags and the help tick are known, so one attempt is one FSRS review; if the row was reviewed again in between, it is left alone. Leech and retire checks are shared with the old path (`applyRating`); retirement streaks re-infer with the new rule when the flag is on. New problems still go through admission. The old `POST /api/resolve/:id/complete` is unchanged.
+- Did, UI (`74d3db0`): with the flag on, each re-solve row on Today has Start (opens LeetCode, starts the timer), ✓ Done and Skip instead of `ResolveCompleteForm`; Done calls the same `markDone` as a new problem, so MistakeCapture follows, and then the existing note offer. `ResolvePlanSlot` now carries `topicId` so the session counts toward the problem's own topic. Started re-solves keep their timer across reloads. The Re-solve page still uses the old form (out of scope; Phase 5 decides its place).
+- Fix found while checking in a browser: ts-fsrs v5 has same-day learning steps on by default, so a fresh problem's first re-solve rated Good came back due in **10 minutes** and could reappear on Today the same day. The unified path now schedules with short-term steps off (a 1-minute clean solve of Two City Scheduling → due in 8 days). The old outcome form still has the 10-minute behavior on live; it goes away when `unifiedCompletion` is turned on.
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ with the worktree `.env` (shared 23, intelligence 180, integrations 197, backend 136). New: 16 rating cases in `ProblemReviewEngine.test.ts`; `unified-completion.test.ts` (9: re-solve recorded and rescheduled at Done; smooth capture keeps one review; tags + help redo from the pre-state; slow schedules sooner than fast; days not minutes for a fresh card; a third clean fast solve of a stable problem retires it; new problems still admitted; slots carry `topicId`; flag off leaves the pool alone). Mutation checks: removing the redo, the saved pre-state, or the no-short-term option each fails a test; restored.
+- Browser check: the overhaul build was run in Claude's cloud workspace against a copy of the dev DB with all flags on (Chromium there; none on the Linux side of your Mac). Checked: Today without the Revision column (P4.3), re-solve rows with Start / ✓ Done / Skip, a started row with its timer, MistakeCapture after Done on a re-solve, and the DB afterwards (attempt `kind = resolve`, problem `Solved`, due in 8 days, gone from today's slots).
+- Design check: re-solve rows reuse the suggested-row buttons, timer and active state; no new styles (§2). No outcome picker, tap-only (§3). Engine rule is pure in `@dsa/intelligence`, wiring in `context.ts` (§4).
+- Surprises: untimed Done records the existing 25-minute default as the time, so an untimed re-solve rates Good on Medium/Hard and Good at exactly the target on Easy.
+- Next suggested task: P4.4.
+
 ### 2026-10-25 — P4.3 Hide the topic Revision column and the post-solve revision popup
 - Did: behind `hideTopicRevision`. **Backend** (`PlanService`, flag passed from `context.ts`): the topic revision queue is empty, so `revisionTopics`, `revisionProblems`, `revisionTotalDue` and `revisionDeferred` are empty/0 (F1), the 25 minutes per revision topic drop out of `estimatedDuration` (F2), and the catch-up compression no longer writes `next_revision_at` (F3). Due re-solves are untouched (problem FSRS). **Frontend**: new `api.getFlags()` (`GET /api/flags`, cached 1 h) and a `FeatureFlags` type. Today hides the Revision panel (U1) and skips the revision offer after MistakeCapture (U2). The panel stays hidden until the flags load, so the overhaul build never flashes it; a failed fetch counts as all-off (live behavior). When the right column has nothing left (panel hidden and Up next hidden in focus mode), the left column takes the full width (`today-grid--single`). Hide only: no component or route deleted. The "Recall ≠ execution" chip (U3) is not in P4.3 and stays.
 - Also (commit `ab051e9`): `SessionService.test.ts` built its config from the worktree `.env`, where `FLAG_HIDE_TOPIC_REVISION=true`, so 2 SM-2 warm-up cases failed under `pnpm test` in the worktree (they passed only without a `.env`). It now pins the flags off; the flag-on cases already live in `fsrs-topic-signals.test.ts`.
