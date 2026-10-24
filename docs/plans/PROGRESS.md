@@ -10,7 +10,7 @@
 | P1.2 | done | 0c66fa9 | SM-2 dependents in verification.md; 7 feed decisions, 10 UI only |
 | P1.3 | done | 738d136 | Today data flow in verification.md; 11 surfaces, 7 duplicates |
 | P2.1 | done | c1f4139 | regression test only; existing 7/21/45/120 caps kept |
-| P2.2 | done | P22SHA | 5 topics repaired on the dev DB; repair made idempotent and leaves due dates alone |
+| P2.2 | done | c5b7ef1 | 5 topics repaired on the dev DB; repair made idempotent and leaves due dates alone |
 | P3.1 | done | 61e670b | `problem-progress.ts`; Revision needed = covered; checked on a read-only dev-DB copy |
 | P3.2 | todo | | |
 | P3.3 | todo | | |
