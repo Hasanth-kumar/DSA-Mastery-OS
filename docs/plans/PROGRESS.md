@@ -9,8 +9,8 @@
 | P1.1 | done | 9b234f2 | code verdicts in verification.md; data queries local-only |
 | P1.2 | done | 0c66fa9 | SM-2 dependents in verification.md; 7 feed decisions, 10 UI only |
 | P1.3 | done | 738d136 | Today data flow in verification.md; 11 surfaces, 7 duplicates |
-| P2.1 | todo | | |
-| P2.2 | todo | | |
+| P2.1 | done | c1f4139 | regression test only; existing 7/21/45/120 caps kept |
+| P2.2 | todo | | local-only (needs dev db) |
 | P3.1 | todo | | |
 | P3.2 | todo | | |
 | P3.3 | todo | | |
@@ -38,6 +38,13 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-24 — P2.1 Confirm the scorer fix stops the corruption
+- Did: Added one regression test to `packages/backend/src/services/session-outcome-scoring.test.ts`. It runs the production path: four coach hints recorded through `ctx.coachUsage`, then `SessionService.completeSession`, then `RevisionEngine.applyQuality`. The weak topic (confidence 20) starts from a grown SM-2 state (interval 30, repetition 4, ease 2.5). A 1-minute session logged as smooth scores below 80, so it does not get SM-2 quality 5. The interval stays at or under the 7-day cap for confidence below 40, and `next_revision_at` is no more than 7 days out. The ease factor drops below 2.5, which only happens at quality 3 or lower. No production code changed. The 7 / 21 / 45 / 120 caps and the rule that quality ≥ 3 lengthens the interval are unchanged.
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). Mutation check: with the cap in `RevisionEngine.applyQuality` replaced by infinity, the new test fails (interval 71 days against a cap of 7), and so does the existing "never schedules a topic beyond…" test. I then restored the cap. The health test again created `data/sqlite/dsa.db`, which I deleted.
+- Data check: code-only mode — no `.env`, no credentials, no `data/dev/dsa.dev.db`. No data needed.
+- Surprises / plan corrections: none. P2.2 needs the dev database (schedule repair plus before/after metrics), so it is local-only here. The next eligible code task is P3.1.
+- Next suggested task: P2.2 locally; in code-only mode, P3.1.
+
 ### 2026-10-23 — P1.3 Map the Today page data flow
 - Did: Added a P1.3 section to `docs/plans/verification.md`. It lists the six endpoints Today polls every 60 seconds and the service behind each, the 11 surfaces on `TodayPage.tsx` (T1–T11) with their data and actions, and seven duplicates (D1–D7). The same new problem appears in FocusCard and as Suggested row 01 (D1). The same due re-solve appears in FocusCard and in the Re-solve section (D2). A solved problem can appear in both the Revision column and the re-solve slots (D3). The first revision problem appears in the Revision column and in the post-solve offer (D4). There are two Start paths (D5). The plan is built twice per poll, once by `/api/plan/today` and once inside `/api/analytics/dashboard`, whose copy no page reads (D6). Due slots are computed twice (D7). FocusCard has no actions at all. Added a short P1.3 note to P5.1 in the plan. No behavior change.
 - Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). Docs only, no new tests. This VM had no `node_modules`, so I ran `pnpm install --frozen-lockfile` first (no lockfile change). The health test again created `data/sqlite/dsa.db`, which I deleted.
