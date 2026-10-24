@@ -202,7 +202,7 @@ Sizes: **XS** < 30 min · **S** ≈ 1 session · **M** ≈ 2 sessions (split it)
 **P3.3 Make the manual topic pin safe** · S · depends P3.1
 - Keep manual pinning as a user override, but:
   - show it visibly ("Pinned: Greedy Sorting · Unpin") on Today;
-  - auto-expire the pin when the pinned topic's first pass is complete, or after **14 days** (🔶 Santosh decides; default 14 days), logging the reason.
+  - auto-expire the pin when the pinned topic's first pass is complete (P3.1 definition), or after **7 days** (D2 answered 2026-10-24), whichever comes first, logging the reason.
 - Clear the current pin in the **dev DB** only. Add the live-unpin step to `live-migration-steps.md`.
 - *Acceptance:* tests for expiry. Today on the dev DB no longer serves only Greedy Sorting.
 
@@ -303,7 +303,7 @@ Target model, with one job each:
 **P7.3 Pass tracking per topic** · S · depends P3.1
 - Pure function: `topicPass(topic, attempts)` →
   - `0` untouched
-  - `1` foundation: ≥ **4** problems covered (🔶 quota; default 4)
+  - `1` foundation (D3 answered 2026-10-24, replaces the flat quota): if the topic has fewer than 4 problems, all of them covered; otherwise all Easy covered **and** at least `min(3, #Medium)` Medium covered. "Covered" is the P3.1 definition.
   - `2` consolidated: ≥ **7** covered (or all Easy and Medium covered) **and** ≥ 2 clean cold solves (no wrong-approach, help ≤ Hint) (🔶 gate; default count + clean-solve)
   - `3` mastered: confidence ≥ 70, assist < 25%, and no overdue re-solves
 - Tests for each boundary.
@@ -340,8 +340,8 @@ Agents copy these into `QUESTIONS.md` on day 1. Defaults apply only after 3 unan
 | ID | Question | Default |
 |---|---|---|
 | D1 | Branch `overhaul` from the WIP commit (`wip/focus-planner`) or from `main`? | WIP |
-| D2 | Pin auto-expiry duration | 14 days |
-| D3 | Pass 1 quota per pattern (3 / 4 / 5) | 4 |
+| D2 | Pin auto-expiry duration | 14 days (answered 2026-10-24: 7 days) |
+| D3 | Pass 1 quota per pattern (3 / 4 / 5) | 4 (answered 2026-10-24: difficulty-aware rule, see P7.3) |
 | D4 | Pass 2 gate: count only, or count + ≥ 2 clean cold solves | count + clean |
 | D5 | Flashcard warm-up on Today: off / optional / always | optional, off |
 | D6 | Build the pre-solve pattern gate? | build, flag off |
