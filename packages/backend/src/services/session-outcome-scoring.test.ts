@@ -183,6 +183,35 @@ describe("outcome-based session scoring", () => {
       expect(topic.sm2Interval).toBeLessThanOrEqual(maxIntervalDaysForConfidence(topic.confidence));
     }
   });
+
+  it("keeps a 1-minute heavy-hint session on a weak topic inside the confidence cap", async () => {
+    // A long-running SM-2 state: uncapped, quality 5 would grow 30 days to ~78.
+    ctx.topicRepo.update("topic-a", { sm2Interval: 30, sm2Repetition: 4, sm2Efactor: 2.5 });
+    for (let i = 0; i < 4; i++) {
+      ctx.coachUsage.set("problem-1", (ctx.coachUsage.get("problem-1") ?? 0) + 1);
+    }
+
+    const before = Date.now();
+    const result = await ctx.sessionService.completeSession({
+      topicId: "topic-a",
+      problemId: "problem-1",
+      studyDuration: 1,
+      problemsSolved: 1,
+      mistakeTag: null, // logged as smooth, but the hints are known
+    });
+
+    // SM-2 quality 5 starts at 80.
+    expect(result.session.productivityScore).toBeLessThan(80);
+
+    const topic = ctx.topicRepo.findById("topic-a")!;
+    expect(topic.confidence).toBeLessThan(40);
+    const cap = maxIntervalDaysForConfidence(topic.confidence);
+    expect(cap).toBe(7);
+    expect(topic.sm2Interval).toBeLessThanOrEqual(cap);
+    expect(topic.nextRevisionAt!.getTime()).toBeLessThanOrEqual(before + cap * DAY + 60_000);
+    // Quality 4 keeps the ease factor at 2.5 and 5 raises it; only quality <= 3 lowers it.
+    expect(topic.sm2Efactor).toBeLessThan(2.5);
+  });
 });
 
 describe("focus plan on the plan endpoint", () => {
