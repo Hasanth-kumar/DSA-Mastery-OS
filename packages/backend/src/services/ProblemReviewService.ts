@@ -1,5 +1,6 @@
 import type {
   AdmissionReason,
+  CompletionOutcome,
   IntelligenceOrchestrator,
   PoolBackfillItem,
   ProblemReviewConfig,
@@ -18,6 +19,7 @@ import type {
   ProblemReviewRepository,
   ProblemReviewRow,
 } from "../repositories/ProblemReviewRepository.js";
+import type { SyncMetaRepository } from "../repositories/SyncMetaRepository.js";
 import type { EventBus } from "./EventBus.js";
 import { applyFsrsRating, resolveRatingToGrade } from "./fsrs.js";
 
@@ -110,6 +112,8 @@ export class ProblemReviewService {
     private readonly problemRepo: ProblemRepository,
     private readonly attemptRepo: AttemptRepository,
     private readonly events: EventBus,
+    /** Holds the pre-attempt FSRS state so MistakeCapture can redo a rating (P4.2). */
+    private readonly syncMeta: SyncMetaRepository,
   ) {
     this.cfg = config.resolve.engine;
   }
@@ -287,6 +291,83 @@ export class ProblemReviewService {
       kind: "resolve",
     });
 
+    const { patch, leech, retired } = this.applyRating(review, rating, now, priorRatings);
+
+    // "attempt" drives the existing plan/analytics invalidation subscription.
+    this.events.publish("attempt");
+    this.events.publish("resolve");
+
+    return {
+      problemId,
+      inferredRating,
+      rating,
+      due: patch.due,
+      intervalDays: Math.max(0, Math.round((patch.due - now) / MS_PER_DAY)),
+      leech,
+      retired,
+    };
+  }
+
+  /** In the pool and not retired: a solve of it is a re-solve (P4.2). */
+  isActiveInPool(problemId: string): boolean {
+    const review = this.reviewRepo.findById(problemId);
+    return review != null && !review.retired;
+  }
+
+  /**
+   * P4.2 — the one completion path for a re-solve logged like a new problem
+   * (Start → ✓ Done → MistakeCapture, no outcome picker). Called twice per
+   * attempt: at ✓ Done (time and auto-captured help known) and again after
+   * MistakeCapture (tags and the help tick known). The first call saves the
+   * pre-attempt FSRS row; the second redoes the rating from it, so one attempt
+   * is always exactly one FSRS review. If the row was reviewed again in
+   * between, the second call leaves it alone. Returns null for a problem that
+   * is not in the pool, or when nothing was changed.
+   */
+  completeAttempt(attempt: AttemptRow, now = Date.now()): CompleteResolveResult | null {
+    const current = this.reviewRepo.findById(attempt.problemId);
+    if (!current) return null;
+    const key = `resolve_pre:${attempt.id}`;
+    const saved = this.syncMeta.get(key);
+    let base: ProblemReviewRow;
+    let appliedAt: number;
+    if (saved) {
+      const pre = JSON.parse(saved) as { review: ProblemReviewRow; appliedAt: number };
+      if (current.lastReview !== pre.appliedAt) return null;
+      base = pre.review;
+      appliedAt = pre.appliedAt;
+    } else {
+      if (current.retired) return null;
+      base = current;
+      appliedAt = now;
+      this.syncMeta.set(key, JSON.stringify({ review: current, appliedAt }));
+    }
+
+    const problem = this.problemRepo.findById(attempt.problemId);
+    const rating = this.engine.inferCompletionRating(completionOf(attempt, problem?.difficulty), this.cfg);
+    const prior = this.pastResolveRatings(attempt.problemId, attempt.id);
+    const { patch, leech, retired } = this.applyRating(base, rating, appliedAt, prior);
+
+    this.events.publish("resolve");
+    return {
+      problemId: attempt.problemId,
+      inferredRating: rating,
+      rating,
+      due: patch.due,
+      intervalDays: Math.max(0, Math.round((patch.due - appliedAt) / MS_PER_DAY)),
+      leech,
+      retired,
+    };
+  }
+
+  /** One FSRS review of a pooled problem: schedule, then leech and retire checks. */
+  private applyRating(
+    review: ProblemReviewRow,
+    rating: ResolveRating,
+    now: number,
+    priorRatings: ResolveRating[],
+  ) {
+    const problemId = review.problemId;
     const patch = applyFsrsRating(review, resolveRatingToGrade(rating), now);
     const leech = rating === "again" && this.engine.isLeech({ lapses: patch.lapses }, this.cfg);
     const retired =
@@ -307,20 +388,7 @@ export class ProblemReviewService {
       suspended: leech ? 1 : review.suspended,
       retired: retired ? 1 : 0,
     });
-
-    // "attempt" drives the existing plan/analytics invalidation subscription.
-    this.events.publish("attempt");
-    this.events.publish("resolve");
-
-    return {
-      problemId,
-      inferredRating,
-      rating,
-      due: patch.due,
-      intervalDays: Math.max(0, Math.round((patch.due - now) / MS_PER_DAY)),
-      leech,
-      retired,
-    };
+    return { patch, leech, retired };
   }
 
   /** Skip = defer to tomorrow (§2) — never dropped, never stacked. */
@@ -423,11 +491,15 @@ export class ProblemReviewService {
    * clean/not-clean. Clean = solved cold (no coach, no hints, no tags); the
    * exact good/easy split doesn't matter to shouldRetire.
    */
-  private pastResolveRatings(problemId: string): ResolveRating[] {
+  private pastResolveRatings(problemId: string, excludeAttemptId?: string): ResolveRating[] {
+    const unified = this.config.flags.unifiedCompletion;
+    const difficulty = unified ? this.problemRepo.findById(problemId)?.difficulty : undefined;
     return this.attemptRepo
       .findByProblemId(problemId, 50)
-      .filter((a) => a.kind === "resolve")
+      .filter((a) => a.kind === "resolve" && a.id !== excludeAttemptId)
       .map((a): ResolveRating => {
+        // P4.2: attempts from the unified flow re-infer with the same rule.
+        if (unified) return this.engine.inferCompletionRating(completionOf(a, difficulty), this.cfg);
         const tags = parseMistakeTags(a.mistakeTag);
         if (tags.includes(COULD_NOT_SOLVE_TAG)) return "again";
         if (a.usedCoach || (a.hintCount ?? 0) > 0 || tags.length > 0) return "hard";
@@ -438,6 +510,16 @@ export class ProblemReviewService {
 
 function toDifficulty(value: string | null | undefined): TopicDifficulty | null {
   return value === "Easy" || value === "Medium" || value === "Hard" ? value : null;
+}
+
+/** The unified-flow signals of one attempt row (P4.2). */
+function completionOf(a: AttemptRow, difficulty: string | null | undefined): CompletionOutcome {
+  return {
+    timeTakenMin: a.timeTaken,
+    difficulty: toDifficulty(difficulty),
+    mistakeTags: parseMistakeTags(a.mistakeTag),
+    usedHelp: a.usedCoach === 1 || (a.hintCount ?? 0) > 0,
+  };
 }
 
 function toSignal(a: AttemptRow) {

@@ -123,6 +123,7 @@ export function createAppContext(
     problemRepo,
     attemptRepo,
     events,
+    syncMetaRepo,
   );
   const planService = new PlanService(
     intelligence,

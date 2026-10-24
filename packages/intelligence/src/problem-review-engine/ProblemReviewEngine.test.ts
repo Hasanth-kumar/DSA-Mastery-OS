@@ -3,6 +3,7 @@ import {
   DEFAULT_PROBLEM_REVIEW_CONFIG,
   ProblemReviewEngine,
   type AttemptSignal,
+  type CompletionOutcome,
   type ProblemReviewState,
   type ResolveOutcome,
 } from "./ProblemReviewEngine.js";
@@ -86,6 +87,41 @@ describe("ProblemReviewEngine.inferRating (§5)", () => {
   it("uses per-difficulty cutoffs", () => {
     expect(engine.inferRating(outcome({ difficulty: "Hard", timeTakenMin: 60 }))).toBe("easy");
     expect(engine.inferRating(outcome({ difficulty: "Easy", timeTakenMin: 60 }))).toBe("good");
+  });
+});
+
+function completion(overrides: Partial<CompletionOutcome> = {}): CompletionOutcome {
+  return { timeTakenMin: 30, difficulty: "Medium", mistakeTags: [], usedHelp: false, ...overrides };
+}
+
+describe("ProblemReviewEngine.inferCompletionRating (P4.2)", () => {
+  // Medium target is 45 min, so "fast" is ≤ 22.5 and "slow" is > 45.
+  it.each([
+    // [label, overrides, rating]
+    ["fast and clean", { timeTakenMin: 20 }, "easy"],
+    ["exactly half the target", { timeTakenMin: 22.5 }, "easy"],
+    ["clean within the target", { timeTakenMin: 40 }, "good"],
+    ["clean at the target", { timeTakenMin: 45 }, "good"],
+    ["clean but slow", { timeTakenMin: 50 }, "hard"],
+    ["untimed and clean", { timeTakenMin: null }, "good"],
+    ["fast with an edge-case slip", { timeTakenMin: 15, mistakeTags: ["edge-case"] }, "good"],
+    ["fast with an off-by-one", { timeTakenMin: 15, mistakeTags: ["off-by-one"] }, "good"],
+    ["slow with an edge-case slip", { timeTakenMin: 60, mistakeTags: ["edge-case"] }, "hard"],
+    ["fast but needed help", { timeTakenMin: 15, usedHelp: true }, "hard"],
+    ["wrong approach, no help", { timeTakenMin: 30, mistakeTags: ["wrong-approach"] }, "hard"],
+    ["could not recall the pattern, no help", { mistakeTags: ["pattern-recall"] }, "hard"],
+    ["help and a wrong approach", { usedHelp: true, mistakeTags: ["wrong-approach"] }, "again"],
+    ["help and no pattern recall", { usedHelp: true, mistakeTags: ["pattern-recall", "edge-case"] }, "again"],
+    ["could not solve", { timeTakenMin: 10, mistakeTags: ["could-not-solve"] }, "again"],
+  ] as const)("%s", (_label, overrides, rating) => {
+    expect(engine.inferCompletionRating(completion(overrides))).toBe(rating);
+  });
+
+  it("judges time against the per-difficulty target", () => {
+    expect(engine.inferCompletionRating(completion({ difficulty: "Easy", timeTakenMin: 12 }))).toBe("easy");
+    expect(engine.inferCompletionRating(completion({ difficulty: "Easy", timeTakenMin: 30 }))).toBe("hard");
+    expect(engine.inferCompletionRating(completion({ difficulty: "Hard", timeTakenMin: 70 }))).toBe("good");
+    expect(engine.inferCompletionRating(completion({ difficulty: null, timeTakenMin: 50 }))).toBe("hard");
   });
 });
 

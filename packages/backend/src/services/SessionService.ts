@@ -233,7 +233,13 @@ export class SessionService {
       const hintCount = this.coachUsage?.get(input.problemId) ?? 0;
       usedCoach = hintCount > 0;
       this.coachUsage?.delete(input.problemId);
-      attemptId = this.attemptRepo?.create({
+      // P4.2: a problem in the re-solve pool logged through the normal flow is
+      // a re-solve. It records as one, and its FSRS rating is inferred here and
+      // redone after MistakeCapture (ProblemReviewService.completeAttempt).
+      const isResolve =
+        this.config.flags.unifiedCompletion &&
+        (this.problemReviews?.isActiveInPool(input.problemId) ?? false);
+      const attempt = this.attemptRepo?.create({
         problemId: input.problemId,
         topicId: input.topicId,
         sessionId: sessionRow.id,
@@ -242,9 +248,15 @@ export class SessionService {
         mistakeTag: input.mistakeTag ?? null,
         usedCoach,
         hintCount,
-      }).id;
-      // Admission re-eval after every attempt (re-solve design §4).
-      this.problemReviews?.evaluateAdmission(input.problemId);
+        kind: isResolve ? "resolve" : "solve",
+      });
+      attemptId = attempt?.id;
+      if (isResolve && attempt) {
+        this.problemReviews?.completeAttempt(attempt);
+      } else {
+        // Admission re-eval after every attempt (re-solve design §4).
+        this.problemReviews?.evaluateAdmission(input.problemId);
+      }
     }
     // A completed session on the topic lifts its leech suspensions (§5).
     this.problemReviews?.onTopicRevised(input.topicId);
@@ -438,10 +450,18 @@ export class SessionService {
    * Finalize problem status after mistake capture (1.4): tags → Revision needed,
    * smooth solve → Solved.
    */
-  async finalizeProblemAfterMistake(problemId: string, tags: string[]): Promise<void> {
+  async finalizeProblemAfterMistake(
+    problemId: string,
+    tags: string[],
+    attempt?: AttemptRow,
+  ): Promise<void> {
     const problem = this.problemRepo.findById(problemId);
     if (!problem) return;
     this.applyProblemStatus(problemId, tags, problem);
+    // P4.2: tags and the help tick are known now — redo the re-solve's rating.
+    if (attempt?.kind === "resolve" && this.config.flags.unifiedCompletion) {
+      this.problemReviews?.completeAttempt(attempt);
+    }
     // Tags recorded after the attempt can flip the admission decision (§4).
     this.problemReviews?.evaluateAdmission(problemId);
     await this.planService.invalidateTodaysPlan();

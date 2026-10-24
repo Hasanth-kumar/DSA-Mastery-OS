@@ -30,6 +30,7 @@ export { computePriorityScore } from "./topic-priority-engine/scoring.js";
 export {
   ProblemReviewEngine,
   type AdmissionReason,
+  type CompletionOutcome,
   type ProblemReviewConfig,
   type PoolBackfillItem,
   type ProblemReviewState,

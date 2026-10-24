@@ -77,6 +77,23 @@ export interface ResolveOutcome {
   difficulty: TopicDifficulty | null;
 }
 
+/**
+ * P4.2: what the unified Start → ✓ Done → MistakeCapture flow knows about one
+ * attempt. No outcome picker: the rating comes from these signals alone.
+ */
+export interface CompletionOutcome {
+  /** Minutes from Start to ✓ Done; null when not timed. */
+  timeTakenMin: number | null;
+  difficulty: TopicDifficulty | null;
+  /** Tags from MistakeCapture (empty = smooth, or not captured yet). */
+  mistakeTags: readonly string[];
+  /** Needed help: the "used coach / outside help" tick or in-app hints. */
+  usedHelp: boolean;
+}
+
+/** Tags that mean the approach itself was missing, not a slip in the details. */
+const APPROACH_TAGS = new Set(["wrong-approach", "pattern-recall"]);
+
 /** Scheduling snapshot of one pooled problem (subset of `problem_reviews`). */
 export interface ProblemReviewState {
   problemId: string;
@@ -163,6 +180,34 @@ export class ProblemReviewEngine {
     // Untimed cold solve → "good": don't stretch the interval without evidence.
     if (outcome.timeTakenMin == null || outcome.timeTakenMin > cutoff) return "good";
     return "easy";
+  }
+
+  /**
+   * P4.2: rating for the unified completion flow (re-solves logged like new
+   * problems). Time is judged against the per-difficulty target
+   * (`slowThresholdMin`, 25 / 45 / 75 min by default):
+   *
+   * | Signals | Rating |
+   * |---|---|
+   * | `could-not-solve`, or help **and** a missing approach | again |
+   * | help, a missing approach, or slower than the target | hard |
+   * | only detail slips (edge case, off-by-one), or untimed | good |
+   * | clean, at most the target | good |
+   * | clean, at most half the target | easy |
+   */
+  inferCompletionRating(
+    outcome: CompletionOutcome,
+    config: ProblemReviewConfig = DEFAULT_PROBLEM_REVIEW_CONFIG,
+  ): ResolveRating {
+    const tags = outcome.mistakeTags;
+    const missingApproach = tags.some((t) => APPROACH_TAGS.has(t));
+    if (tags.includes("could-not-solve")) return "again";
+    if (outcome.usedHelp && missingApproach) return "again";
+    const target = config.slowThresholdMin[outcome.difficulty ?? "Medium"];
+    const slow = outcome.timeTakenMin != null && outcome.timeTakenMin > target;
+    if (outcome.usedHelp || missingApproach || slow) return "hard";
+    if (tags.length > 0 || outcome.timeTakenMin == null) return "good";
+    return outcome.timeTakenMin <= target / 2 ? "easy" : "good";
   }
 
   /**
