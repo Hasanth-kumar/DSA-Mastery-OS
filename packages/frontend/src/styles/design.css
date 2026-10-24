@@ -3348,3 +3348,12 @@ button.settings-row {
   border-right: none;
   border-bottom: none;
 }
+
+/* One problem at a time: rows locked while another problem's timer runs. */
+.problem-row-v2--locked {
+  opacity: 0.45;
+}
+
+.problem-row-v2--locked button:disabled {
+  cursor: not-allowed;
+}

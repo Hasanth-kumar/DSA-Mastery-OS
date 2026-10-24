@@ -112,6 +112,12 @@ export function TodayPage({ onOpenCoach }: Props) {
 
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
   const [starts, setStarts] = useState<Record<string, number>>(loadStarts);
+  // One problem at a time (todayQueueV2): starting one locks the others until
+  // it is Done or its timer is stopped. The running one is the latest start.
+  const singleActive = flags?.todayQueueV2 === true;
+  const activeId = singleActive
+    ? (Object.entries(starts).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null)
+    : null;
   const [notes, setNotes] = useState<Record<string, ProblemNote>>({});
   const [openNoteId, setOpenNoteId] = useState<string | null>(null);
   const [explain, setExplain] = useState<ScoreExplanation | null>(null);
@@ -187,16 +193,42 @@ export function TodayPage({ onOpenCoach }: Props) {
       for (const [id, startedAt] of Object.entries(prev)) {
         if (allowed.has(id)) next[id] = startedAt;
       }
+      // One problem at a time: older timers from before the rule keep only the latest.
+      if (singleActive) {
+        const latest = Object.entries(next).sort((a, b) => b[1] - a[1])[0];
+        for (const id of Object.keys(next)) if (id !== latest?.[0]) delete next[id];
+      }
       if (Object.keys(next).length === Object.keys(prev).length) return prev;
       saveStarts(next);
       return next;
     });
-  }, [plan]);
+  }, [plan, singleActive]);
 
   const startProblem = (problemId: string) => {
-    const next = { ...starts, [problemId]: Date.now() };
+    if (singleActive && activeId && activeId !== problemId) return;
+    const next = singleActive
+      ? { [problemId]: Date.now() }
+      : { ...starts, [problemId]: Date.now() };
     setStarts(next);
     saveStarts(next);
+  };
+
+  /** Stop the running timer without logging (one-problem-at-a-time mode). */
+  const stopProblem = (problemId: string) => {
+    const next = { ...starts };
+    delete next[problemId];
+    setStarts(next);
+    saveStarts(next);
+  };
+
+  /** Another problem is running, so this one can't be started or logged yet. */
+  const blockedBy = (problemId: string): string | null => {
+    if (!singleActive || !activeId || activeId === problemId) return null;
+    return (
+      plan?.suggestedProblems.find((p) => p.problemId === activeId)?.name ??
+      plan?.resolveSlots?.find((s) => s.problemId === activeId)?.name ??
+      "the running problem"
+    );
   };
 
   const elapsedMinutes = (problemId: string): number | null => {
@@ -256,7 +288,7 @@ export function TodayPage({ onOpenCoach }: Props) {
       return;
     }
     const first = plan?.suggestedProblems[0];
-    if (!first || starts[first.problemId]) return;
+    if (!first || starts[first.problemId] || activeId) return;
     if (first.leetcodeLink) window.open(first.leetcodeLink, "_blank", "noopener,noreferrer");
     startProblem(first.problemId);
   };
@@ -272,6 +304,8 @@ export function TodayPage({ onOpenCoach }: Props) {
           startProblem(slot.problemId);
         },
         onDone: (slot) => void markDone(slot.problemId, slot.name, slot.topicId ?? undefined),
+        onStop: singleActive ? (slot) => stopProblem(slot.problemId) : undefined,
+        blockedBy,
         loggingId: logging,
       }
     : undefined;
@@ -580,7 +614,7 @@ export function TodayPage({ onOpenCoach }: Props) {
                   setWarmupGraded(graded);
                   setFlow({ kind: "idle" });
                   const first = plan.suggestedProblems[0];
-                  if (first && !starts[first.problemId]) startProblem(first.problemId);
+                  if (first && !starts[first.problemId] && !activeId) startProblem(first.problemId);
                 }}
               />
             </div>
@@ -773,13 +807,17 @@ export function TodayPage({ onOpenCoach }: Props) {
               )}
               {plan.suggestedProblems.slice(0, 3).map((p, i) => {
                 const started = starts[p.problemId] != null;
+                const blocker = blockedBy(p.problemId);
+                const lockedTitle = blocker ? `Finish or stop ${blocker} first` : undefined;
                 const note = notes[p.problemId];
                 const minutes = elapsedMinutes(p.problemId);
                 const diffClass = `diff-${p.difficulty?.toLowerCase() ?? "medium"}`;
                 return (
                   <div
                     key={p.problemId}
-                    className={`problem-row-v2${started ? " problem-row-v2--active" : ""}`}
+                    className={`problem-row-v2${started ? " problem-row-v2--active" : ""}${
+                      blocker ? " problem-row-v2--locked" : ""
+                    }`}
                   >
                     <span className="problem-row-index" aria-hidden>
                       {String(i + 1).padStart(2, "0")}
@@ -827,6 +865,8 @@ export function TodayPage({ onOpenCoach }: Props) {
                         <button
                           type="button"
                           className="btn-secondary-v2"
+                          disabled={blocker != null}
+                          title={lockedTitle}
                           onClick={() => {
                             if (p.leetcodeLink) {
                               window.open(p.leetcodeLink, "_blank", "noopener,noreferrer");
@@ -841,7 +881,8 @@ export function TodayPage({ onOpenCoach }: Props) {
                         type="button"
                         className={`btn-done-v2${pulseId === p.problemId ? " btn--confirm-pulse" : ""}`}
                         data-done-button="true"
-                        disabled={logging === p.problemId}
+                        disabled={logging === p.problemId || blocker != null}
+                        title={lockedTitle}
                         onClick={() => {
                           setPulseId(p.problemId);
                           void markDone(p.problemId, p.name);
@@ -852,6 +893,15 @@ export function TodayPage({ onOpenCoach }: Props) {
                       >
                         {logging === p.problemId ? "Saving…" : "✓ Done"}
                       </button>
+                      {singleActive && started && (
+                        <button
+                          type="button"
+                          className="btn-secondary-v2 btn-compact-v2"
+                          onClick={() => stopProblem(p.problemId)}
+                        >
+                          Stop timer
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn-ghost-v2 today-coach-btn"

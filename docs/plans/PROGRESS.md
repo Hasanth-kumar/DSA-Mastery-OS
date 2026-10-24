@@ -38,6 +38,13 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-25 — Santosh's feedback: one problem at a time on Today (off-plan, small)
+- Asked by Santosh after trying the overhaul build: starting a second problem while one is running shouldn't be possible.
+- Did: behind `todayQueueV2`. Starting a problem (suggested or re-solve) locks every other row: its Start and ✓ Done are disabled, with the tooltip "Finish or stop <name> first", and the row is dimmed (`.problem-row-v2--locked`, opacity only). The running row gets a "Stop timer" button that clears the timer without logging. Start session and the post-warm-up auto-start don't start anything while a problem is running. Timers saved from before the rule keep only the latest start. Flag off: unchanged (several timers allowed).
+- Also asked: the started row's tint looked different from before. The row markup and `.problem-row-v2--active { background: var(--accent-soft) }` are identical to `main`. The tint is the accent color at 16% (light) / 12% (dark). The accent, theme and glow are saved per browser origin, so the overhaul build on port 5273 starts with the default Coral accent rather than whatever was chosen on the live app at 5173. Not a code change; noted for Santosh.
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ (frontend only; no frontend tests exist). Browser check: started Partition Labels → Jump Game II and both re-solves locked and dimmed; Stop timer → all unlocked.
+- Design check: no new color, font or component; one opacity-only rule. Supports "protect problem-solving time" (§3).
+
 ### 2026-10-25 — P4.4 Demote flashcards from the hot path
 - Did: no flag was named for this, so it sits behind `todayQueueV2` (the Today flag; on here, off on live). With it on, "Start session" (and the `dsa:start-session` shortcut) opens the first suggested problem on LeetCode and starts its timer; the warm-up is a quiet `Warm up first · 3 cards` link in the hero that opens the same `WarmupCard`. Flag off: unchanged. Review tab unchanged.
 - Tests: no frontend tests exist; `pnpm build` ✅ `pnpm lint` ✅.

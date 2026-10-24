@@ -16,6 +16,10 @@ export interface UnifiedResolveFlow {
   elapsedMinutes: (problemId: string) => number | null;
   onStart: (slot: ResolvePlanSlot) => void;
   onDone: (slot: ResolvePlanSlot) => void;
+  /** One-problem-at-a-time mode: stop this row's timer without logging. */
+  onStop?: (slot: ResolvePlanSlot) => void;
+  /** Name of the problem running elsewhere, which locks this row. */
+  blockedBy: (problemId: string) => string | null;
   loggingId: string | null;
 }
 
@@ -66,11 +70,15 @@ function SlotRow({
   };
 
   const started = unified?.startedAt(slot.problemId) != null;
+  const blocker = unified?.blockedBy(slot.problemId) ?? null;
+  const lockedTitle = blocker ? `Finish or stop ${blocker} first` : undefined;
   const minutes = unified?.elapsedMinutes(slot.problemId) ?? null;
 
   return (
     <div
-      className={`problem-row-v2${slot.promoted || started ? " problem-row-v2--active" : ""}`}
+      className={`problem-row-v2${slot.promoted || started ? " problem-row-v2--active" : ""}${
+        blocker ? " problem-row-v2--locked" : ""
+      }`}
     >
       <div className="problem-row-top">
         {slot.leetcodeLink ? (
@@ -111,6 +119,8 @@ function SlotRow({
             <button
               type="button"
               className="btn-secondary-v2"
+              disabled={blocker != null}
+              title={lockedTitle}
               onClick={() => unified.onStart(slot)}
             >
               Start
@@ -120,11 +130,21 @@ function SlotRow({
             type="button"
             className="btn-done-v2"
             data-done-button="true"
-            disabled={unified.loggingId === slot.problemId}
+            disabled={unified.loggingId === slot.problemId || blocker != null}
+            title={lockedTitle}
             onClick={() => unified.onDone(slot)}
           >
             ✓ Done
           </button>
+          {started && unified.onStop && (
+            <button
+              type="button"
+              className="btn-secondary-v2 btn-compact-v2"
+              onClick={() => unified.onStop?.(slot)}
+            >
+              Stop timer
+            </button>
+          )}
           {!started && (
             <button
               type="button"
