@@ -36,6 +36,8 @@ export interface TopicState {
   noteCoverage?: { solved: number; withNotes: number };
   /** Recent attempts solved with coach help vs total (D) — "with coach" < "cold". */
   coachAssist?: { assisted: number; solved: number };
+  /** The topic's most recent attempt was tagged could-not-solve (P3.5). */
+  lastAttemptCouldNotSolve?: boolean;
 }
 
 /** One-tap mistake taxonomy captured after logging a problem. */
@@ -244,6 +246,10 @@ export interface DifficultyRecommendation {
   primary: TopicDifficulty;
   secondary: TopicDifficulty | null;
   ratio: [number, number];
+  /** Stage that produced it (P3.5). */
+  stage?: TopicStage;
+  /** Plain-English reason, e.g. "Practicing: Medium". */
+  reason?: string;
 }
 
 export interface IntelligenceUpdate {

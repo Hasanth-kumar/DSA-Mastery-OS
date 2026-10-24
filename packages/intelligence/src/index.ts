@@ -47,6 +47,7 @@ export {
   type SessionOutcomeInput,
 } from "./session-outcome.js";
 export { deriveTopicStage, LEARNING_MIN_ATTEMPTS } from "./topic-stage.js";
+export { suggestionSlots } from "./difficulty-engine/DifficultyEngine.js";
 export { maxIntervalDaysForConfidence } from "./revision-engine/sm2.js";
 export { planScheduleRepair, type ScheduleRepairItem } from "./revision-engine/schedule-repair.js";
 export { buildFocusPlan, type FocusInput } from "./focus-engine/FocusPlanner.js";

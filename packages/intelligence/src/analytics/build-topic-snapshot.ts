@@ -77,6 +77,8 @@ export interface TopicSignalExtras {
   notedProblemIds?: ReadonlySet<string>;
   /** Coach-assisted vs total recent attempts (D4). */
   coachAssist?: { assisted: number; solved: number };
+  /** Latest attempt on this topic was tagged could-not-solve (P3.5). */
+  lastAttemptCouldNotSolve?: boolean;
 }
 
 /**
@@ -135,6 +137,7 @@ export function buildTopicState(
     ...state,
     mistakeTagCounts: extras.mistakeTagCounts ?? {},
     coachAssist: extras.coachAssist,
+    lastAttemptCouldNotSolve: extras.lastAttemptCouldNotSolve ?? false,
     noteCoverage: {
       solved: solved.length,
       withNotes: extras.notedProblemIds

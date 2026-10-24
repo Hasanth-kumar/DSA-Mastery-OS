@@ -5,46 +5,48 @@ import { DifficultyEngine } from "./DifficultyEngine.js";
 describe("DifficultyEngine", () => {
   const engine = new DifficultyEngine();
 
-  it("recommends Hard for high confidence and productivity", () => {
-    const topic = makeTopic({
-      id: "strong",
-      name: "Strong",
-      confidence: 85,
-      recentSessions: [
-        { date: new Date(), problemsSolved: 2, productivityScore: 80, duration: 45 },
-        { date: new Date(), problemsSolved: 2, productivityScore: 78, duration: 45 },
-      ],
-    });
-    expect(engine.recommendDifficulty(topic).primary).toBe("Hard");
+  // P3.5: difficulty by stage, not raw confidence.
+  it.each([
+    // [case, overrides, primary, secondary]
+    ["untouched pattern → learning", { totalAttempts: 0, confidence: 0 }, "Easy", "Medium"],
+    ["2 attempts → still learning", { totalAttempts: 2, confidence: 30 }, "Easy", "Medium"],
+    ["3 attempts → practicing", { totalAttempts: 3, confidence: 20 }, "Medium", null],
+    ["practicing at any confidence below retaining", { totalAttempts: 12, confidence: 65 }, "Medium", null],
+    [
+      "practicing after could-not-solve → Easy",
+      { totalAttempts: 6, confidence: 40, lastAttemptCouldNotSolve: true },
+      "Easy",
+      null,
+    ],
+    [
+      "retaining → Medium and Hard",
+      { totalAttempts: 10, confidence: 75, coachAssist: { assisted: 1, solved: 8 } },
+      "Medium",
+      "Hard",
+    ],
+  ] as const)("%s", (_case, overrides, primary, secondary) => {
+    const rec = engine.recommendDifficulty(makeTopic({ id: "t", name: "T", ...overrides }));
+    expect(rec.primary).toBe(primary);
+    expect(rec.secondary).toBe(secondary);
   });
 
-  it("recommends Easy only for low confidence", () => {
-    const topic = makeTopic({
-      id: "weak",
-      name: "Weak",
-      confidence: 25,
-      recentSessions: [],
-    });
-    const rec = engine.recommendDifficulty(topic);
-    expect(rec.primary).toBe("Easy");
-    expect(rec.secondary).toBeNull();
-  });
-
-  it("discounts coach-assisted solves — no Hard promotion on borrowed confidence (D)", () => {
-    const sessions = [
-      { date: new Date(), problemsSolved: 2, productivityScore: 80, duration: 45 },
-      { date: new Date(), problemsSolved: 2, productivityScore: 78, duration: 45 },
-    ];
-    const cold = makeTopic({ id: "cold", name: "Cold", confidence: 85, recentSessions: sessions });
+  it("coach-assisted confidence does not unlock Hard (D)", () => {
     const assisted = makeTopic({
       id: "assisted",
       name: "Assisted",
+      totalAttempts: 10,
       confidence: 85,
-      recentSessions: sessions,
       coachAssist: { assisted: 3, solved: 4 },
     });
-    expect(engine.recommendDifficulty(cold).primary).toBe("Hard");
-    expect(engine.recommendDifficulty(assisted).primary).toBe("Medium");
+    const rec = engine.recommendDifficulty(assisted);
+    expect(rec.stage).toBe("practicing");
+    expect(rec.primary).toBe("Medium");
+    expect(rec.secondary).toBeNull();
+  });
+
+  it("serves learning as one Easy then one Medium", () => {
+    const rec = engine.recommendDifficulty(makeTopic({ id: "t", name: "T", totalAttempts: 1 }));
+    expect(engine.pickProblemDifficulties(rec, 2)).toEqual(["Easy", "Medium"]);
   });
 
   it("picks problem difficulties by ratio", () => {

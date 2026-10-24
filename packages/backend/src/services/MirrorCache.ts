@@ -4,6 +4,7 @@ import { buildTopicState, groupBy, type TopicState } from "@dsa/intelligence";
 import type { SqliteDb } from "@dsa/integrations";
 import type { ProblemRow } from "../repositories/ProblemRepository.js";
 import type { SessionRow } from "../repositories/SessionRepository.js";
+import { parseMistakeTags } from "../repositories/AttemptRepository.js";
 
 const MISTAKE_WINDOW_DAYS = 90;
 
@@ -86,6 +87,7 @@ export class MirrorCache {
     const mistakeTagsByTopic = this.loadMistakeTagCounts();
     const notedProblemIds = this.loadNotedProblemIds();
     const coachAssistByTopic = this.loadCoachAssist();
+    const couldNotSolveTopics = this.loadLastAttemptCouldNotSolve();
 
     const topicStates = topicRows.map((topic) =>
       buildTopicState(
@@ -96,6 +98,7 @@ export class MirrorCache {
           mistakeTagCounts: mistakeTagsByTopic.get(topic.id),
           notedProblemIds,
           coachAssist: coachAssistByTopic.get(topic.id),
+          lastAttemptCouldNotSolve: couldNotSolveTopics.has(topic.id),
         },
       ),
     );
@@ -172,6 +175,28 @@ export class MirrorCache {
       byTopic.set(row.topicId, { assisted: row.assisted, solved: row.solved });
     }
     return byTopic;
+  }
+
+  /** Topics whose most recent attempt carries the could-not-solve tag (P3.5). */
+  private loadLastAttemptCouldNotSolve(): Set<string> {
+    const rows = this.db
+      .select({
+        topicId: problemAttempts.topicId,
+        mistakeTag: problemAttempts.mistakeTag,
+        solvedAt: problemAttempts.solvedAt,
+      })
+      .from(problemAttempts)
+      .where(isNotNull(problemAttempts.topicId))
+      .orderBy(desc(problemAttempts.solvedAt))
+      .all();
+    const seen = new Set<string>();
+    const result = new Set<string>();
+    for (const row of rows) {
+      if (!row.topicId || seen.has(row.topicId)) continue;
+      seen.add(row.topicId);
+      if (parseMistakeTags(row.mistakeTag).includes("could-not-solve")) result.add(row.topicId);
+    }
+    return result;
   }
 
   private loadNotedProblemIds(): Set<string> {
