@@ -3337,3 +3337,14 @@ button.settings-row {
 
 .focus-plan-tip ul { margin: 6px 0 0; padding-left: 18px; }
 .focus-plan-tip strong { color: var(--text); font-weight: 600; }
+
+/* P4.3: Today with no right column (topic Revision hidden, Up next hidden). */
+.today-grid.today-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.today-grid--single .today-grid-col--left {
+  padding-right: 0;
+  border-right: none;
+  border-bottom: none;
+}

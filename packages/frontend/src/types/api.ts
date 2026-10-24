@@ -109,6 +109,18 @@ export interface FocusPlan {
   tip: { tag: string; count: number; checklist: string[] } | null;
 }
 
+/** Overhaul feature flags (`GET /api/flags`, read-only; `FLAG_<NAME>` in the backend `.env`). */
+export interface FeatureFlags {
+  todayQueueV2: boolean;
+  unifiedCompletion: boolean;
+  /** Topic SM-2 retired: Today hides the Revision column and the post-solve revision offer (P4.3). */
+  hideTopicRevision: boolean;
+  helpLevelCapture: boolean;
+  takeawayField: boolean;
+  curriculumV2: boolean;
+  spiralPasses: boolean;
+}
+
 export interface StudyPlan {
   date: string;
   /** Time-boxed daily plan; absent on cached plans from before this field existed. */

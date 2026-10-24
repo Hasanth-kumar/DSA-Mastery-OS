@@ -133,6 +133,7 @@ export function createAppContext(
     problemReviewService,
     sessionRepo,
     config.schedulers.timezone,
+    { hideTopicRevision: config.flags.hideTopicRevision },
   );
   const coachUsage = new Map<string, number>();
   const sessionService = new SessionService(

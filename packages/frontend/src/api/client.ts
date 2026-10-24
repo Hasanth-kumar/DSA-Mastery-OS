@@ -3,6 +3,7 @@ import type {
   ChatThread,
   CoachModelList,
   CurriculumState,
+  FeatureFlags,
   HealthInfo,
   LeetCodeUserStats,
   LeetCodeActivity,
@@ -141,6 +142,8 @@ const CACHE_TTL = {
   problems: 60_000,
   sessions: 15_000,
   plan: 30_000,
+  // Flags come from the backend .env and only change on restart.
+  flags: 3_600_000,
   leetcode: 3_600_000,
   curriculum: 60_000,
   activity: 60_000,
@@ -166,6 +169,8 @@ export const api = {
     cachedFetch("problems", CACHE_TTL.problems, () =>
       request<{ problems: Problem[]; count: number }>("/api/problems"),
     ),
+
+  getFlags: () => cachedFetch("flags", CACHE_TTL.flags, () => request<FeatureFlags>("/api/flags")),
 
   getPlan: () =>
     cachedFetch("plan", CACHE_TTL.plan, () => request<StudyPlan>("/api/plan/today")),

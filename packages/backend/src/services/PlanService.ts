@@ -30,6 +30,8 @@ export class PlanService {
     /** Session history for the focus plan's weekly target and gap detection. */
     private readonly sessionRepo?: SessionRepository,
     private readonly configuredTimeZone?: string,
+    /** Overhaul flags this service reads (P4.3). */
+    private readonly flags: { hideTopicRevision?: boolean } = {},
   ) {
     this.problemSuggestions = new ProblemSuggestionService(problemRepo);
   }
@@ -77,9 +79,12 @@ export class PlanService {
       difficultyRec,
     );
 
-    const queue = this.intelligence
-      .getRevisionQueue(topics)
-      .filter((t) => t.id !== primaryTopic.id);
+    // P4.3 (verification.md F1–F3): with topic SM-2 retired there is no topic
+    // revision queue, so nothing is deferred (no nextRevisionAt write) and no
+    // revision minutes are budgeted. Due re-solves come from problem FSRS below.
+    const queue = this.flags.hideTopicRevision
+      ? []
+      : this.intelligence.getRevisionQueue(topics).filter((t) => t.id !== primaryTopic.id);
 
     // Catch-up compression (1.5): after skipped days, never stack the whole
     // backlog into one plan — keep 1–2 items and push the rest forward.

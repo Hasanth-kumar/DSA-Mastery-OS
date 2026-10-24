@@ -28,6 +28,7 @@ import {
   studyHoursThisMonth,
 } from "../lib/todayStats.js";
 import type {
+  FeatureFlags,
   ProblemNote,
   RecallGradeResult,
   RevisionProblem,
@@ -36,6 +37,15 @@ import type {
 } from "../types/api.js";
 
 const PLAN_POLL_MS = 60_000;
+const FLAGS_OFF: FeatureFlags = {
+  todayQueueV2: false,
+  unifiedCompletion: false,
+  hideTopicRevision: false,
+  helpLevelCapture: false,
+  takeawayField: false,
+  curriculumV2: false,
+  spiralPasses: false,
+};
 const SESSIONS_POLL_MS = 60_000;
 /** Date marker — once graded or skipped, the revision offer never nags again that day (C). */
 const REVISION_OFFER_KEY = "dsa-revision-offer-day";
@@ -87,6 +97,18 @@ export function TodayPage({ onOpenCoach }: Props) {
 
   const fetchSync = useCallback(() => api.getSyncStatus(), []);
   const { data: sync } = usePolling(fetchSync, PLAN_POLL_MS, { initialLoading: false });
+
+  // Overhaul flags. `null` until loaded; a failed fetch means "all off" (live behavior).
+  const [flags, setFlags] = useState<FeatureFlags | null>(null);
+  useEffect(() => {
+    api
+      .getFlags()
+      .then(setFlags)
+      .catch(() => setFlags({ ...FLAGS_OFF }));
+  }, []);
+  // P4.3: with topic SM-2 retired, no Revision column and no post-solve revision
+  // offer. Hidden until the flags arrive so the overhaul build never flashes it.
+  const showTopicRevision = flags != null && !flags.hideTopicRevision;
 
   const [flow, setFlow] = useState<Flow>({ kind: "idle" });
   const [starts, setStarts] = useState<Record<string, number>>(loadStarts);
@@ -248,7 +270,7 @@ export function TodayPage({ onOpenCoach }: Props) {
   /** After the capture chain: offer optional revision once per day (C). */
   const finishCapture = () => {
     setCelebrateAt(Date.now());
-    const problem = plan?.revisionProblems?.[0];
+    const problem = showTopicRevision ? plan?.revisionProblems?.[0] : undefined;
     const today = new Date().toDateString();
     if (problem && localStorage.getItem(REVISION_OFFER_KEY) !== today) {
       setFlow({ kind: "revision-offer", problem });
@@ -353,6 +375,9 @@ export function TodayPage({ onOpenCoach }: Props) {
               : -1;
 
   const curriculumItems = plan?.curriculum?.items ?? [];
+  const showUpNext = !focusMode && curriculumItems.length > 0;
+  // Nothing left for the right column → the left column takes the full width.
+  const showRightColumn = showTopicRevision || showUpNext;
   const curriculumStep = plan?.curriculum
     ? `${plan.curriculum.currentIndex + 1} of ${plan.curriculum.topicNames.length}`
     : null;
@@ -685,7 +710,7 @@ export function TodayPage({ onOpenCoach }: Props) {
             </section>
           )}
 
-          <div className="today-grid">
+          <div className={showRightColumn ? "today-grid" : "today-grid today-grid--single"}>
             <div className="today-grid-col today-grid-col--left">
             <section>
               <div className="panel-v2-header">
@@ -801,125 +826,129 @@ export function TodayPage({ onOpenCoach }: Props) {
             />
             </div>
 
-            <div className="today-grid-col today-grid-col--right">
-              <section className="revision-panel">
-                <div className="panel-v2-header">
-                  <h3 className="panel-v2-title">Revision</h3>
-                  <span className="panel-v2-meta">{dueTotal} due</span>
-                </div>
-                {dueTotal === 0 && (
-                  <EmptyState
-                    compact
-                    icon={<CheckCircleIcon />}
-                    title="Nothing due today"
-                    hint="Spaced repetition is happy."
-                  />
-                )}
-                {topRevision && (
-                  <>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.55rem" }}>
-                      <span className="revision-hero-name">{topRevision.name}</span>
-                      {topRevision.isWeakArea && <span className="weak-badge">WEAK</span>}
+            {showRightColumn && (
+              <div className="today-grid-col today-grid-col--right">
+                {showTopicRevision && (
+                  <section className="revision-panel">
+                    <div className="panel-v2-header">
+                      <h3 className="panel-v2-title">Revision</h3>
+                      <span className="panel-v2-meta">{dueTotal} due</span>
                     </div>
-                    <div className="revision-progress">
-                      <div className="revision-bar">
-                        <div
-                          className="revision-bar-fill"
-                          style={{ width: `${topRevision.confidence}%` }}
-                        />
-                      </div>
-                      <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.74rem", color: "var(--text-muted)" }}>
-                        {topRevision.confidence}
-                      </span>
-                    </div>
-                    <div className="revision-meta">
-                      confidence ·{" "}
-                      {topRevision.lastRevised
-                        ? `last revised ${new Date(topRevision.lastRevised).toLocaleDateString()}`
-                        : "never revised"}
-                    </div>
-                  </>
-                )}
-                {(plan.revisionProblems ?? []).map((p) => {
-                  const graded = revisionGrades[p.topicId];
-                  return (
-                    <div key={p.problemId} className="revision-problem-row">
-                      <div className="problem-row-top">
-                        {p.leetcodeLink ? (
-                          <a
-                            href={p.leetcodeLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="problem-row-name"
-                          >
-                            {p.name}
-                          </a>
-                        ) : (
-                          <span className="problem-row-name">{p.name}</span>
-                        )}
-                        <span
-                          className={`diff-badge diff-${p.difficulty?.toLowerCase() ?? "medium"}`}
-                        >
-                          {(p.difficulty ?? "?").slice(0, 3).toUpperCase()}
-                        </span>
-                        <span className="chip-v2">
-                          {p.mode === "resolve" ? "re-solve" : "recall"}
-                        </span>
-                      </div>
-                      <div className="revision-meta">{p.topicName}</div>
-                      {graded ? (
-                        <div className="revision-meta">
-                          next review{" "}
-                          {graded.nextRevisionAt
-                            ? new Date(graded.nextRevisionAt).toLocaleDateString()
-                            : "unscheduled"}
+                    {dueTotal === 0 && (
+                      <EmptyState
+                        compact
+                        icon={<CheckCircleIcon />}
+                        title="Nothing due today"
+                        hint="Spaced repetition is happy."
+                      />
+                    )}
+                    {topRevision && (
+                      <>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.55rem" }}>
+                          <span className="revision-hero-name">{topRevision.name}</span>
+                          {topRevision.isWeakArea && <span className="weak-badge">WEAK</span>}
                         </div>
-                      ) : (
-                        <RevisionGradeButtons
-                          busy={gradingTopic != null}
-                          onGrade={(quality) => void gradeRevisionProblem(p, quality)}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-                {dueTotal > 1 && (
-                  <button
-                    type="button"
-                    className="today-show-more-link"
-                    onClick={() => void toggleAllRevisions()}
-                  >
-                    {showAllRevisions ? "Show less" : `Show all ${dueTotal} →`}
-                  </button>
-                )}
-                {showAllRevisions && revisionQueue && (
-                  <ul className="today-revision-list">
-                    {revisionQueue.map((t) => (
-                      <li key={t.id}>
-                        <span>{t.name}</span>
-                        <span className="muted">
-                          {t.nextRevisionAt
-                            ? `due ${new Date(t.nextRevisionAt).toLocaleDateString()}`
+                        <div className="revision-progress">
+                          <div className="revision-bar">
+                            <div
+                              className="revision-bar-fill"
+                              style={{ width: `${topRevision.confidence}%` }}
+                            />
+                          </div>
+                          <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.74rem", color: "var(--text-muted)" }}>
+                            {topRevision.confidence}
+                          </span>
+                        </div>
+                        <div className="revision-meta">
+                          confidence ·{" "}
+                          {topRevision.lastRevised
+                            ? `last revised ${new Date(topRevision.lastRevised).toLocaleDateString()}`
                             : "never revised"}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                        </div>
+                      </>
+                    )}
+                    {(plan.revisionProblems ?? []).map((p) => {
+                      const graded = revisionGrades[p.topicId];
+                      return (
+                        <div key={p.problemId} className="revision-problem-row">
+                          <div className="problem-row-top">
+                            {p.leetcodeLink ? (
+                              <a
+                                href={p.leetcodeLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="problem-row-name"
+                              >
+                                {p.name}
+                              </a>
+                            ) : (
+                              <span className="problem-row-name">{p.name}</span>
+                            )}
+                            <span
+                              className={`diff-badge diff-${p.difficulty?.toLowerCase() ?? "medium"}`}
+                            >
+                              {(p.difficulty ?? "?").slice(0, 3).toUpperCase()}
+                            </span>
+                            <span className="chip-v2">
+                              {p.mode === "resolve" ? "re-solve" : "recall"}
+                            </span>
+                          </div>
+                          <div className="revision-meta">{p.topicName}</div>
+                          {graded ? (
+                            <div className="revision-meta">
+                              next review{" "}
+                              {graded.nextRevisionAt
+                                ? new Date(graded.nextRevisionAt).toLocaleDateString()
+                                : "unscheduled"}
+                            </div>
+                          ) : (
+                            <RevisionGradeButtons
+                              busy={gradingTopic != null}
+                              onGrade={(quality) => void gradeRevisionProblem(p, quality)}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                    {dueTotal > 1 && (
+                      <button
+                        type="button"
+                        className="today-show-more-link"
+                        onClick={() => void toggleAllRevisions()}
+                      >
+                        {showAllRevisions ? "Show less" : `Show all ${dueTotal} →`}
+                      </button>
+                    )}
+                    {showAllRevisions && revisionQueue && (
+                      <ul className="today-revision-list">
+                        {revisionQueue.map((t) => (
+                          <li key={t.id}>
+                            <span>{t.name}</span>
+                            <span className="muted">
+                              {t.nextRevisionAt
+                                ? `due ${new Date(t.nextRevisionAt).toLocaleDateString()}`
+                                : "never revised"}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </section>
                 )}
-              </section>
 
-              {!focusMode && curriculumItems.length > 0 && (
-                <section className="today-up-next">
-                  <h3 className="panel-v2-title" style={{ marginBottom: "1.1rem" }}>
-                    Up next
-                  </h3>
-                  <UpNextTimeline
-                    items={curriculumItems}
-                    startIndex={plan.curriculum?.currentIndex ?? 0}
-                  />
-                </section>
-              )}
-            </div>
+                {showUpNext && (
+                  <section className="today-up-next">
+                    <h3 className="panel-v2-title" style={{ marginBottom: "1.1rem" }}>
+                      Up next
+                    </h3>
+                    <UpNextTimeline
+                      items={curriculumItems}
+                      startIndex={plan.curriculum?.currentIndex ?? 0}
+                    />
+                  </section>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
