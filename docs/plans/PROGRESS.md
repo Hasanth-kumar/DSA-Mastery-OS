@@ -20,10 +20,10 @@
 | P4.2 | done | fce0b86, 74d3db0 | a: one completion path + inferred rating; b: Today re-solve rows use Start → Done → MistakeCapture |
 | P4.3 | done | edf6d19 | no revision queue, minutes or deferral write; Today hides Revision panel + offer |
 | P4.4 | done | 93395ba | warm-up opt-in behind `todayQueueV2` |
-| P5.1 | todo | | |
-| P5.2 | todo | | |
-| P5.3 | todo | | |
-| P5.4 | todo | | |
+| P5.1 | done | 7181648 | `plan.queue` from pure `buildTodayQueue`; resolve-event invalidation; dashboard stops building a plan |
+| P5.2 | done | b0ddb64 | queue renders in Suggested problems; hidden rows + coach `hidePattern` |
+| P5.3 | done | b0ddb64 | decision line + Switch pattern in the hero; new strip |
+| P5.4 | done | b0ddb64 | Re-solve section and FocusCard hidden with the queue on |
 | P6.1 | todo | | |
 | P6.2 | todo | | |
 | P6.3 | todo | | |
@@ -38,6 +38,17 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-25 — Phase 5: one Today cockpit (P5.1–P5.4)
+- Santosh asked to continue with Phase 5 in this session.
+- **P5.1** (`7181648`): new pure `buildTodayQueue` (`focus-engine/TodayQueue.ts`), reusing FocusPlanner's week, gap and minutes helpers. At most 1 re-solve, the most overdue that is on another pattern (else the most overdue); then the block's problems: the first always, the second if it fits a 90-minute budget (top of the 60–90 min block); after a gap of 3+ days, one 20-minute Easy only (re-solve first, else the easiest new problem). Rows carry `revealPattern`, `minutes`, `reason`, `dueSince`, and an opaque `topicId`; hidden rows carry no topic name. `decision` = dayKind, mode, topic (name, stage, first-pass covered/total; `null` on a mixed day), why, week, gap. On a mixed day the why never uses the curriculum reasoning (a test caught it naming the pattern). Built in `PlanService` as `plan.queue` only with `todayQueueV2`; every day is a block day until P7.4. With the flag: the plan is invalidated on `resolve` events (a skipped re-solve leaves at once; P1.3), and `/api/analytics/dashboard` returns `plan: null` instead of building a second plan (D6). `POST /api/session` now takes the topic from the problem when none is sent, so hidden rows log without the frontend knowing the topic.
+- **P5.2–P5.4** (`b0ddb64`): with the flag on and a queue present, Suggested problems renders the queue. The re-solve row has a mono kicker `RE-SOLVE · DUE SINCE OCT 21` and its reason ("2 mistakes, used coach"); no pattern, no note chip. Rows keep Start / ✓ Done / Coach ↗ and the one-at-a-time lock. Coach ↗ on a hidden row passes `hidePattern`: the chat context then has the problem and its own history only (no topic name, topic mistake counts, weakness signals or note) and the prompt tells the coach not to name the pattern unless asked for that hint rung. The hero shows the decision text and a mono line (stage · covered of total · ~minutes · sessions this week), `Why this?` (block days), and `Switch pattern`, an inline select that pins a topic (P3.3 expiry). Mixed days read `Mixed practice` with `N problems · ~M min`. New strip: Patterns (touched / total), Problems (attempted · clean · to re-solve), This week (sessions / target · days left), Stage (stage · covered / total; "Mixed · patterns hidden today" on a mixed day). The separate Re-solve section and the FocusCard are hidden; the revision column already was (P4.3).
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (shared 23, intelligence 191, integrations 198, backend 143). New: `TodayQueue.test.ts` (11), `today-queue.test.ts` (7: order and hidden pattern, each problem once, skip leaves at once, dashboard without plan, logging without a topic, coach context without the pattern, flag off), 1 chat-prompt test. Mutation check: without the resolve-event invalidation the skip test fails; restored.
+- Data check (copy of the dev DB): a re-entry day (5 days since the last session): one row, Move Zeroes (Easy re-solve, 20 min, pattern hidden). With a session added yesterday: Move Zeroes (re-solve; Two City Scheduling skipped because it is Greedy Sorting itself), Partition Labels, Jump Game II, ~90 min.
+- Browser check (Claude's cloud workspace, copy of the dev DB, all flags on): re-entry and normal days. Each problem appears once; no Re-solve section, FocusCard or Revision column. Fixed during the check: "re-solve" wrapped at its hyphen in the strip. A mixed day can't be produced until P7.4; covered by engine tests only.
+- Design check: no new colors, fonts, shadows, pills or boxes. New CSS is type only: the re-solve kicker and the hero decision line reuse the mono eyebrow voice (10.5px, `--text-subtle`); the reason uses `--text-muted`. The switch control reuses `.today-show-more-link` and `.coach-select`. Weekly target instead of the streak cell (§2.3 canvas-first strip, §3 no backlog guilt).
+- Known limits: with the coach's full learning context on, the general weak-topics list can still name patterns, though not linked to the problem. The Problems cell counts by status (`Solved` = clean, `Revision needed` = to re-solve). The Re-solve tab still uses the old form.
+- Next suggested task: P6.1.
+
 ### 2026-10-25 — Santosh's feedback: one problem at a time on Today (off-plan, small)
 - Asked by Santosh after trying the overhaul build: starting a second problem while one is running shouldn't be possible.
 - Did: behind `todayQueueV2`. Starting a problem (suggested or re-solve) locks every other row: its Start and ✓ Done are disabled, with the tooltip "Finish or stop <name> first", and the row is dimmed (`.problem-row-v2--locked`, opacity only). The running row gets a "Stop timer" button that clears the timer without logging. Start session and the post-warm-up auto-start don't start anything while a problem is running. Timers saved from before the rule keep only the latest start. Flag off: unchanged (several timers allowed).
