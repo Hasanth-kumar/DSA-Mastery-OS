@@ -71,6 +71,7 @@ export {
   createCurriculumEngine,
   type CurriculumConfig,
   type CurriculumSelection,
+  type PrimaryTopicSource,
   type TopicProblemCounts,
 } from "./curriculum-engine/CurriculumEngine.js";
 

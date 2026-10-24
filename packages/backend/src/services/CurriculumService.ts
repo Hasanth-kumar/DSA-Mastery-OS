@@ -1,9 +1,11 @@
 import {
   buildTopicProblemCounts,
   createCurriculumEngine,
+  buildTopicGraphEdges,
   evaluatePinExpiry,
   PIN_MAX_AGE_DAYS,
   type PinExpiryReason,
+  type PrimaryTopicSource,
   type CurriculumConfig,
   type CurriculumItem,
   type CurriculumProgress,
@@ -18,6 +20,8 @@ const TOPICS_KEY = "curriculum_topics";
 const ACTIVE_TOPIC_KEY = "curriculum_active_topic_id";
 const PIN_SET_AT_KEY = "curriculum_active_topic_set_at";
 const PIN_LAST_EXPIRY_KEY = "curriculum_pin_last_expiry";
+/** The topic the curriculum is working through (auto; not a manual pin). P3.4. */
+const CURRENT_TOPIC_KEY = "curriculum_current_topic_id";
 
 export interface PinExpiryRecord {
   topicId: string;
@@ -136,12 +140,31 @@ export class CurriculumService {
     return buildTopicProblemCounts(this.problemRepo.findAll());
   }
 
-  selectForTopics(topics: TopicState[]): CurriculumSelection | null {
-    return this.engine.selectCurrentTopic(
+  /**
+   * Primary topic for today (P3.4): a valid pin, else the current topic while
+   * its first pass has work left, else the highest-priority ready topic.
+   * Remembers the auto-chosen topic so the next day continues it.
+   */
+  selectForTopics(
+    topics: TopicState[],
+  ): (CurriculumSelection & { source: PrimaryTopicSource }) | null {
+    const selection = this.engine.selectPrimaryTopic(
       this.getConfig(),
       topics,
       this.buildProblemCounts(),
+      {
+        currentTopicId: this.syncMetaRepo.get(CURRENT_TOPIC_KEY) || null,
+        edges: buildTopicGraphEdges(topics),
+      },
     );
+    if (
+      selection &&
+      (selection.source === "current" || selection.source === "ranked" || selection.source === "fallback") &&
+      this.syncMetaRepo.get(CURRENT_TOPIC_KEY) !== selection.topic.id
+    ) {
+      this.syncMetaRepo.set(CURRENT_TOPIC_KEY, selection.topic.id);
+    }
+    return selection;
   }
 
   getState(topics: TopicState[]): CurriculumState {
@@ -174,13 +197,6 @@ export class CurriculumService {
   }
 
   listItems(topics: TopicState[]): CurriculumItem[] {
-    const counts = this.buildProblemCounts();
-    return (
-      this.engine.selectCurrentTopic(this.getConfig(), topics, counts)?.items ??
-      this.engine
-        .selectCurrentTopic({ topicNames: this.getTopicNames() }, topics, counts)
-        ?.items ??
-      []
-    );
+    return this.selectForTopics(topics)?.items ?? [];
   }
 }

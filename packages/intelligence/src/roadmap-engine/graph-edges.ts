@@ -7,10 +7,11 @@ function normalize(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 }
 
-function namesMatch(a: string, b: string): boolean {
-  const na = normalize(a);
-  const nb = normalize(b);
-  return na === nb || na.includes(nb) || nb.includes(na);
+/** Whole-phrase containment: the topic name contains `name` as a phrase. */
+function nameContains(topicName: string, name: string): boolean {
+  const t = ` ${normalize(topicName)} `;
+  const n = normalize(name);
+  return n.length > 0 && t.includes(` ${n} `);
 }
 
 /** Canonical DSA labels → common Notion / mirror DB topic name variants. */
@@ -27,16 +28,21 @@ const CANONICAL_TOPIC_ALIASES: Record<string, string[]> = {
   "Dynamic Programming": ["Dynamic Programming (1D)"],
 };
 
+/**
+ * Canonical name → topic id. Exact (normalized) name, then an exact alias,
+ * then a topic whose name contains the name or an alias as a phrase. Never an
+ * alias containing the topic name: that matched "Arrays" to "DP on Subarrays"
+ * and "Binary Search Tree" to "Binary Search" (P3.4).
+ */
 function resolveTopicId(name: string, topics: TopicRef[]): string | null {
-  const exact = topics.find((t) => t.name === name);
-  if (exact) return exact.id;
-
-  const fuzzy = topics.find((t) => namesMatch(t.name, name));
-  if (fuzzy) return fuzzy.id;
-
-  for (const alias of CANONICAL_TOPIC_ALIASES[name] ?? []) {
-    const match = topics.find((t) => t.name === alias || namesMatch(t.name, alias));
-    if (match) return match.id;
+  const candidates = [name, ...(CANONICAL_TOPIC_ALIASES[name] ?? [])];
+  for (const c of candidates) {
+    const exact = topics.find((t) => normalize(t.name) === normalize(c));
+    if (exact) return exact.id;
+  }
+  for (const c of candidates) {
+    const partial = topics.find((t) => nameContains(t.name, c));
+    if (partial) return partial.id;
   }
   return null;
 }

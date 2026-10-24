@@ -87,8 +87,9 @@ describe("curriculum pin (P3.3)", () => {
   it("expires after 7 days and the curriculum takes over", async () => {
     ctx.curriculumService.setActiveTopicId("t-greedy", Date.now() - 7 * DAY - 1000);
     const plan = await getPlan();
-    expect(plan.primaryTopic.id).toBe("t-bs");
+    // The pin is gone; the P3.4 selector chooses (by priority, not the pin).
     expect(plan.curriculum.activeTopicId).toBeNull();
+    expect(plan.reasoning).not.toContain("manual selection");
     expect(ctx.curriculumService.getActiveTopicId()).toBeFalsy();
     expect(ctx.curriculumService.getLastPinExpiry()).toMatchObject({ topicId: "t-greedy", reason: "max-age" });
   });
