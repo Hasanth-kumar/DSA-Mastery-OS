@@ -6,7 +6,7 @@ import type { ProblemSuggestion, ResolvePlanSlot } from "../types.js";
 const TODAY = "2026-10-18";
 
 const resolve = (id: string, difficulty: ResolvePlanSlot["difficulty"], daysOverdue = 3): ResolvePlanSlot => ({
-  problemId: id, name: `Problem ${id}`, difficulty, leetcodeLink: null, daysOverdue, promoted: false, reason: "mistake",
+  problemId: id, name: `Problem ${id}`, difficulty, leetcodeLink: null, topicId: null, daysOverdue, promoted: false, reason: "mistake",
 });
 const fresh = (id: string, difficulty: ProblemSuggestion["difficulty"]): ProblemSuggestion => ({
   problemId: id, name: `New ${id}`, difficulty,

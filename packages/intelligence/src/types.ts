@@ -149,6 +149,61 @@ export interface StudyPlan {
   resolveDeferred?: number;
   /** The one-screen "do this now" plan (time-boxed, gap-aware). */
   focus?: FocusPlan;
+  /** P5.1: Today's single ordered list of problems (`todayQueueV2`). */
+  queue?: TodayQueue;
+}
+
+/**
+ * P5.1 / plan §6.4. A block day works through one pattern's short block with
+ * the pattern shown; a mixed day hides patterns. Until P7.4, every day is a
+ * block day for the primary topic.
+ */
+export type DayKind = "block" | "mixed";
+
+/** One row of Today's queue. */
+export interface TodayQueueBlock {
+  kind: "resolve" | "progression";
+  problemId: string;
+  name: string;
+  difficulty: TopicDifficulty | null;
+  leetcodeLink: string | null;
+  /** Opaque id the log is recorded against. Never a name. */
+  topicId: string | null;
+  /** False for re-solves and mixed rows: no pattern name until ✓ Done (§6.4). */
+  revealPattern: boolean;
+  /** Present only when `revealPattern` is true. */
+  topicName?: string;
+  minutes: number;
+  /** Why this row is here. Never names a hidden row's pattern. */
+  reason: string;
+  /** Re-solves: the calendar day it first fell due, "YYYY-MM-DD". */
+  dueSince?: string;
+}
+
+/** Why today looks the way it does (banner, P5.3). */
+export interface TodayDecision {
+  dayKind: DayKind;
+  /** "reentry" after a gap of 3+ days: one short Easy problem, no backlog. */
+  mode: "normal" | "reentry";
+  /** The block's pattern. Null on a mixed day, so nothing names it. */
+  topic: {
+    id: string;
+    name: string;
+    stage: TopicStage | null;
+    /** First-pass progress: problems covered of the topic's total. */
+    covered: number;
+    total: number;
+  } | null;
+  why: string;
+  week: FocusWeek;
+  gapDays: number | null;
+}
+
+export interface TodayQueue {
+  dayKind: DayKind;
+  blocks: TodayQueueBlock[];
+  totalMinutes: number;
+  decision: TodayDecision;
 }
 
 /** What kind of day this is: a normal session, a gentle restart after a gap, or already done. */

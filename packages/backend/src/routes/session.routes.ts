@@ -76,7 +76,8 @@ export async function sessionRoutes(
 
   app.post<{
     Body: {
-      topicId: string;
+      /** Optional when `problemId` is given: the problem's own topic is used. */
+      topicId?: string;
       problemsSolved?: number;
       studyDuration: number;
       productivityScore?: number;
@@ -88,7 +89,6 @@ export async function sessionRoutes(
     };
   }>("/session", async (request, reply) => {
     const {
-      topicId,
       problemsSolved,
       studyDuration,
       date,
@@ -97,6 +97,10 @@ export async function sessionRoutes(
       mistakeTag,
       warmupGraded,
     } = request.body;
+
+    const topicId =
+      request.body.topicId ||
+      (problemId ? (ctx.problemRepo.findById(problemId)?.topicId ?? undefined) : undefined);
 
     if (!topicId || studyDuration == null) {
       return reply.status(400).send({

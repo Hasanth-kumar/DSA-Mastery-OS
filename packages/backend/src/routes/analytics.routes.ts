@@ -21,6 +21,10 @@ export async function analyticsRoutes(
     "/analytics/dashboard",
     async (request, reply) => {
       const weeks = parseWeeks(request.query.weeks);
+      // P5.1 (P1.3 D6): no page reads the embedded plan; build it once per poll, on /plan/today.
+      if (ctx.config.flags.todayQueueV2) {
+        return reply.send(serializeForJson({ ...ctx.analyticsService.getDashboard(weeks), plan: null }));
+      }
       const [dashboard, plan] = await Promise.all([
         Promise.resolve(ctx.analyticsService.getDashboard(weeks)),
         ctx.planService.generateTodaysPlan(),

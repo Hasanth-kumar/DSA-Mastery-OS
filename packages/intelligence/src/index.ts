@@ -22,6 +22,10 @@ export type {
   FocusMode,
   FocusPlan,
   FocusWeek,
+  DayKind,
+  TodayDecision,
+  TodayQueue,
+  TodayQueueBlock,
 } from "./types.js";
 
 export { MISTAKE_TAG_LABELS } from "./types.js";
@@ -52,6 +56,7 @@ export { suggestionSlots } from "./difficulty-engine/DifficultyEngine.js";
 export { maxIntervalDaysForConfidence } from "./revision-engine/sm2.js";
 export { planScheduleRepair, type ScheduleRepairItem } from "./revision-engine/schedule-repair.js";
 export { buildFocusPlan, type FocusInput } from "./focus-engine/FocusPlanner.js";
+export { buildTodayQueue, type TodayQueueInput } from "./focus-engine/TodayQueue.js";
 export { buildTopicGraphEdges } from "./roadmap-engine/graph-edges.js";
 export {
   createIntelligenceOrchestrator,

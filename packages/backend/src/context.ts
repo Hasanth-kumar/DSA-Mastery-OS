@@ -134,7 +134,7 @@ export function createAppContext(
     problemReviewService,
     sessionRepo,
     config.schedulers.timezone,
-    { hideTopicRevision: config.flags.hideTopicRevision },
+    { hideTopicRevision: config.flags.hideTopicRevision, todayQueueV2: config.flags.todayQueueV2 },
   );
   const coachUsage = new Map<string, number>();
   const sessionService = new SessionService(
@@ -162,7 +162,9 @@ export function createAppContext(
       event.type === "session" ||
       event.type === "topic" ||
       event.type === "problem" ||
-      event.type === "attempt"
+      event.type === "attempt" ||
+      // P5.1 (P1.3): a skipped or admitted re-solve leaves Today at once.
+      (event.type === "resolve" && config.flags.todayQueueV2)
     ) {
       analyticsService.invalidateDashboard();
       void planService.invalidateTodaysPlan();

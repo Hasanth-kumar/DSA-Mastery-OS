@@ -6,7 +6,7 @@ import type {
   StudyPlan,
   TopicState,
 } from "@dsa/intelligence";
-import { buildFocusPlan, computePriorityScore } from "@dsa/intelligence";
+import { buildFocusPlan, buildTodayQueue, computePriorityScore } from "@dsa/intelligence";
 import type { ProblemRepository } from "../repositories/ProblemRepository.js";
 import type { SessionRepository } from "../repositories/SessionRepository.js";
 import type { TopicRepository } from "../repositories/TopicRepository.js";
@@ -31,7 +31,7 @@ export class PlanService {
     private readonly sessionRepo?: SessionRepository,
     private readonly configuredTimeZone?: string,
     /** Overhaul flags this service reads (P4.3). */
-    private readonly flags: { hideTopicRevision?: boolean } = {},
+    private readonly flags: { hideTopicRevision?: boolean; todayQueueV2?: boolean } = {},
   ) {
     this.problemSuggestions = new ProblemSuggestionService(problemRepo);
   }
@@ -152,7 +152,33 @@ export class PlanService {
       reasoning += ` Re-solve promoted: ${slot.name} is ${slot.daysOverdue} days overdue.`;
     }
 
-    const focus = this.buildFocus(topics, primaryTopic, suggestedProblems, resolveSlots, options);
+    const days = this.dayKeys();
+    const focus = this.buildFocus(topics, primaryTopic, suggestedProblems, resolveSlots, options, days);
+    const curriculum = this.curriculumService.toProgress(selection);
+
+    // P5.1: Today's single ordered list (todayQueueV2). Every day is a block
+    // day for the primary topic until P7.4.
+    let todayQueue: StudyPlan["queue"];
+    if (this.flags.todayQueueV2) {
+      const item = curriculum?.items.find((i) => i.topicId === primaryTopic.id);
+      todayQueue = buildTodayQueue({
+        todayKey: days.todayKey,
+        activeDayKeys: days.activeDayKeys,
+        dueResolves: resolveSlots,
+        newProblems: suggestedProblems,
+        topic: {
+          id: primaryTopic.id,
+          name: primaryTopic.name,
+          stage: difficultyRec.stage ?? null,
+          covered: item ? item.totalCount - item.unsolvedCount : 0,
+          total: item?.totalCount ?? 0,
+        },
+        why: reasoning,
+        progressionReason: difficultyRec.reason,
+        minutes: options.availableMinutes,
+        weeklyTarget: options.weeklyTarget,
+      });
+    }
 
     return {
       date: new Date(),
@@ -162,7 +188,7 @@ export class PlanService {
       suggestedProblems,
       estimatedDuration,
       reasoning,
-      curriculum: this.curriculumService.toProgress(selection),
+      curriculum,
       revisionTotalDue: queue.length,
       revisionDeferred: deferred.length,
       memoryExecutionDivergence: primaryScore.memoryExecutionDivergence,
@@ -171,6 +197,20 @@ export class PlanService {
       resolveTotalDue,
       resolveDeferred,
       focus,
+      ...(todayQueue ? { queue: todayQueue } : {}),
+    };
+  }
+
+  /** Today's date and the days with a logged session, in the learner's timezone. */
+  private dayKeys(): { todayKey: string; activeDayKeys: string[] } {
+    const timeZone = learnerTimeZone(this.configuredTimeZone);
+    return {
+      todayKey: dayKeyInTimeZone(Date.now(), timeZone),
+      activeDayKeys: [
+        ...new Set(
+          (this.sessionRepo?.findAll(400) ?? []).map((s) => dayKeyInTimeZone(s.date, timeZone)),
+        ),
+      ],
     };
   }
 
@@ -181,13 +221,9 @@ export class PlanService {
     suggestedProblems: StudyPlan["suggestedProblems"],
     resolveSlots: ResolvePlanSlot[],
     options: PlanOptions,
+    days: { todayKey: string; activeDayKeys: string[] },
   ): StudyPlan["focus"] {
-    const timeZone = learnerTimeZone(this.configuredTimeZone);
-    const activeDayKeys = [
-      ...new Set(
-        (this.sessionRepo?.findAll(400) ?? []).map((s) => dayKeyInTimeZone(s.date, timeZone)),
-      ),
-    ];
+    const { activeDayKeys } = days;
 
     // Most repeated mistake across ALL topics — off-by-one hurts everywhere.
     const totals = new Map<string, number>();
@@ -200,7 +236,7 @@ export class PlanService {
     const top = [...totals.entries()].sort((a, b) => b[1] - a[1])[0];
 
     return buildFocusPlan({
-      todayKey: dayKeyInTimeZone(Date.now(), timeZone),
+      todayKey: days.todayKey,
       activeDayKeys,
       dueResolves: resolveSlots,
       newProblems: suggestedProblems,

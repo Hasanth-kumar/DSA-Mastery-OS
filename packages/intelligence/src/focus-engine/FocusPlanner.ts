@@ -68,13 +68,13 @@ const CHECKLISTS: Record<string, string[]> = {
 };
 
 /** Time to budget for a problem by difficulty (minutes). */
-function minutesFor(difficulty: TopicDifficulty | null | undefined): number {
+export function minutesFor(difficulty: TopicDifficulty | null | undefined): number {
   if (difficulty === "Easy") return 20;
   if (difficulty === "Hard") return 50;
   return 35;
 }
 
-function difficultyRank(d: TopicDifficulty | null | undefined): number {
+export function difficultyRank(d: TopicDifficulty | null | undefined): number {
   return d === "Easy" ? 0 : d === "Medium" || d == null ? 1 : 2;
 }
 
@@ -95,7 +95,7 @@ function weekdayMondayFirst(key: string): number {
   return (js + 6) % 7;
 }
 
-function computeWeek(
+export function computeWeek(
   todayKey: string,
   activeDayKeys: string[],
   target: number,
@@ -111,7 +111,7 @@ function computeWeek(
   return { target, done, remaining, daysLeft, onTrack: remaining <= daysLeft };
 }
 
-function computeGap(todayKey: string, activeDayKeys: string[]): number | null {
+export function computeGap(todayKey: string, activeDayKeys: string[]): number | null {
   const past = activeDayKeys.filter((k) => k <= todayKey).sort();
   if (past.length === 0) return null;
   return diffDays(todayKey, past[past.length - 1]);
