@@ -115,6 +115,16 @@ describe("unified completion (P4.2 backend)", () => {
     expect(review.due!).toBeGreaterThan(Date.now());
   });
 
+  it("a fresh problem's first re-solve is due days later, not minutes (no same-day steps)", async () => {
+    const { ctx, app } = await setup(true);
+    await capture(app, await done(app, "p-pool", 30), []); // clean within target → good
+    const review = ctx.problemReviewRepo.findById("p-pool")!;
+    expect(review.due! - review.lastReview!).toBeGreaterThanOrEqual(DAY);
+
+    const again = await done(app, "p-new", 10); // not pooled: no FSRS
+    expect(ctx.attemptRepo.findById(again)?.kind).toBe("solve");
+  });
+
   it("a smooth MistakeCapture keeps the rating and does not count a second review", async () => {
     const { ctx, app } = await setup(true);
     const attemptId = await done(app, "p-pool", 15);
@@ -170,6 +180,13 @@ describe("unified completion (P4.2 backend)", () => {
     expect(ctx.problemReviewRepo.findById("p-new")).toBeNull();
     await capture(app, attemptId, ["edge-case"]);
     expect(ctx.problemReviewRepo.findById("p-new")?.admissionReason).toBe("mistake");
+  });
+
+  it("plan re-solve slots carry the problem's topic, so the log lands on it", async () => {
+    const { app } = await setup(true);
+    const plan = (await app.inject({ method: "GET", url: "/api/plan/today" })).json();
+    expect(plan.resolveSlots.length).toBeGreaterThan(0);
+    for (const slot of plan.resolveSlots) expect(slot.topicId).toBe("t");
   });
 
   it("flag off: logging a pooled problem leaves its review row alone", async () => {

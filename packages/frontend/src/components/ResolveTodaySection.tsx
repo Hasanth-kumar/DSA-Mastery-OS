@@ -6,9 +6,23 @@ import { RATING_LABELS, ResolveCompleteForm } from "./ResolveCompleteForm.js";
 
 const QUEUE_POLL_MS = 60_000;
 
+/**
+ * P4.2 (`unifiedCompletion`): Today's own Start → timer → ✓ Done →
+ * MistakeCapture handlers. When present, a re-solve logs exactly like a new
+ * problem and the outcome form is not shown.
+ */
+export interface UnifiedResolveFlow {
+  startedAt: (problemId: string) => number | undefined;
+  elapsedMinutes: (problemId: string) => number | null;
+  onStart: (slot: ResolvePlanSlot) => void;
+  onDone: (slot: ResolvePlanSlot) => void;
+  loggingId: string | null;
+}
+
 interface Props {
   slots: ResolvePlanSlot[];
   onChanged: () => void;
+  unified?: UnifiedResolveFlow;
 }
 
 function resultMessage(result: ResolveCompleteResult): string {
@@ -26,11 +40,13 @@ function SlotRow({
   slowThresholdMin,
   onChanged,
   onMessage,
+  unified,
 }: {
   slot: ResolvePlanSlot;
   slowThresholdMin?: Record<"Easy" | "Medium" | "Hard", number>;
   onChanged: () => void;
   onMessage: (text: string, ok: boolean) => void;
+  unified?: UnifiedResolveFlow;
 }) {
   const [completing, setCompleting] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -49,8 +65,13 @@ function SlotRow({
     }
   };
 
+  const started = unified?.startedAt(slot.problemId) != null;
+  const minutes = unified?.elapsedMinutes(slot.problemId) ?? null;
+
   return (
-    <div className={`problem-row-v2${slot.promoted ? " problem-row-v2--active" : ""}`}>
+    <div
+      className={`problem-row-v2${slot.promoted || started ? " problem-row-v2--active" : ""}`}
+    >
       <div className="problem-row-top">
         {slot.leetcodeLink ? (
           <a href={slot.leetcodeLink} target="_blank" rel="noreferrer" className="problem-row-name">
@@ -71,11 +92,51 @@ function SlotRow({
         {slot.daysOverdue > 0 && (
           <span className="muted text-sm">{slot.daysOverdue}d overdue</span>
         )}
+        {started && minutes != null && (
+          <span className="problem-row-timer">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6">
+              <circle cx="8" cy="8" r="6" />
+              <path d="M8 5v3l2 1.4" strokeLinecap="round" />
+            </svg>
+            {minutes} min
+          </span>
+        )}
       </div>
       <p className="muted text-sm" style={{ margin: "0.2rem 0 0.5rem" }}>
         {slot.reason}
       </p>
-      {completing ? (
+      {unified ? (
+        <div className="problem-row-actions">
+          {!started && (
+            <button
+              type="button"
+              className="btn-secondary-v2"
+              onClick={() => unified.onStart(slot)}
+            >
+              Start
+            </button>
+          )}
+          <button
+            type="button"
+            className="btn-done-v2"
+            data-done-button="true"
+            disabled={unified.loggingId === slot.problemId}
+            onClick={() => unified.onDone(slot)}
+          >
+            ✓ Done
+          </button>
+          {!started && (
+            <button
+              type="button"
+              className="btn-secondary-v2 btn-compact-v2"
+              disabled={busy}
+              onClick={() => void skip()}
+            >
+              Skip
+            </button>
+          )}
+        </div>
+      ) : completing ? (
         <ResolveCompleteForm
           problemId={slot.problemId}
           problemName={slot.name}
@@ -111,7 +172,7 @@ function SlotRow({
  * problems — never the full pool. Escalation promotions render uncollapsed;
  * they are the one thing not allowed to hide.
  */
-export function ResolveTodaySection({ slots, onChanged }: Props) {
+export function ResolveTodaySection({ slots, onChanged, unified }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -140,6 +201,7 @@ export function ResolveTodaySection({ slots, onChanged }: Props) {
           slowThresholdMin={queue?.slowThresholdMin}
           onChanged={onChanged}
           onMessage={onMessage}
+          unified={unified}
         />
       ))}
       {collapsible.length > 0 && !expanded && (
@@ -159,6 +221,7 @@ export function ResolveTodaySection({ slots, onChanged }: Props) {
             slowThresholdMin={queue?.slowThresholdMin}
             onChanged={onChanged}
             onMessage={onMessage}
+            unified={unified}
           />
         ))}
     </section>

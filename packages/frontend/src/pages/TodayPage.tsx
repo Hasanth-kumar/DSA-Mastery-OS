@@ -6,7 +6,7 @@ import { MasteryRing } from "../components/MasteryRing.js";
 import { MistakeCapture } from "../components/MistakeCapture.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { ProblemNotePanel } from "../components/ProblemNotePanel.js";
-import { ResolveTodaySection } from "../components/ResolveTodaySection.js";
+import { ResolveTodaySection, type UnifiedResolveFlow } from "../components/ResolveTodaySection.js";
 import { RevisionGradeButtons } from "../components/RevisionGradeButtons.js";
 import { ScoreBar } from "../components/ScoreBar.js";
 import {
@@ -175,7 +175,11 @@ export function TodayPage({ onOpenCoach }: Props) {
   // localStorage entries were pinning the WARM-UP→FOCUS strip open forever.
   useEffect(() => {
     if (!plan) return;
-    const allowed = new Set(plan.suggestedProblems.map((p) => p.problemId));
+    const allowed = new Set([
+      ...plan.suggestedProblems.map((p) => p.problemId),
+      // P4.2: a started re-solve keeps its timer too.
+      ...(plan.resolveSlots ?? []).map((s) => s.problemId),
+    ]);
     setStarts((prev) => {
       const next: Record<string, number> = {};
       for (const [id, startedAt] of Object.entries(prev)) {
@@ -238,6 +242,21 @@ export function TodayPage({ onOpenCoach }: Props) {
       setLogging(null);
     }
   };
+
+  // P4.2 (`unifiedCompletion`): a re-solve logs like a new problem — Start opens
+  // LeetCode and starts the timer, ✓ Done logs it, then MistakeCapture.
+  const unifiedResolve: UnifiedResolveFlow | undefined = flags?.unifiedCompletion
+    ? {
+        startedAt: (problemId) => starts[problemId],
+        elapsedMinutes,
+        onStart: (slot) => {
+          if (slot.leetcodeLink) window.open(slot.leetcodeLink, "_blank", "noopener,noreferrer");
+          startProblem(slot.problemId);
+        },
+        onDone: (slot) => void markDone(slot.problemId, slot.name, slot.topicId ?? undefined),
+        loggingId: logging,
+      }
+    : undefined;
 
   /** One-tap SM-2 grade for a revision problem's topic (C). */
   const gradeRevisionProblem = async (p: RevisionProblem, quality: number) => {
@@ -823,6 +842,7 @@ export function TodayPage({ onOpenCoach }: Props) {
             <ResolveTodaySection
               slots={plan.resolveSlots ?? []}
               onChanged={() => void refresh()}
+              unified={unifiedResolve}
             />
             </div>
 

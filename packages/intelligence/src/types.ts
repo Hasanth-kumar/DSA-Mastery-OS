@@ -197,6 +197,8 @@ export interface ResolvePlanSlot {
   name: string;
   difficulty: TopicDifficulty | null;
   leetcodeLink: string | null;
+  /** The problem's topic: a re-solve logged on Today counts toward it (P4.2). */
+  topicId: string | null;
   daysOverdue: number;
   /** Escalation promotion (§6) — rendered uncollapsed with its reason. */
   promoted: boolean;

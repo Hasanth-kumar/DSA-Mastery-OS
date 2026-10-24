@@ -87,6 +87,7 @@ export interface ResolveDueSelection {
     name: string;
     difficulty: TopicDifficulty | null;
     leetcodeLink: string | null;
+    topicId: string | null;
     daysOverdue: number;
     promoted: boolean;
     reason: string;
@@ -230,6 +231,7 @@ export class ProblemReviewService {
           name: p?.name ?? slot.review.problemId,
           difficulty: toDifficulty(p?.difficulty ?? null),
           leetcodeLink: p?.leetcodeLink ?? null,
+          topicId: p?.topicId ?? null,
           daysOverdue: slot.daysOverdue,
           promoted: slot.promoted,
           reason: this.describePool(slot.review.problemId, slot),
@@ -346,7 +348,9 @@ export class ProblemReviewService {
     const problem = this.problemRepo.findById(attempt.problemId);
     const rating = this.engine.inferCompletionRating(completionOf(attempt, problem?.difficulty), this.cfg);
     const prior = this.pastResolveRatings(attempt.problemId, attempt.id);
-    const { patch, leech, retired } = this.applyRating(base, rating, appliedAt, prior);
+    const { patch, leech, retired } = this.applyRating(base, rating, appliedAt, prior, {
+      shortTermSteps: false,
+    });
 
     this.events.publish("resolve");
     return {
@@ -366,9 +370,11 @@ export class ProblemReviewService {
     rating: ResolveRating,
     now: number,
     priorRatings: ResolveRating[],
+    // The legacy outcome form keeps ts-fsrs's same-day steps until it is retired.
+    fsrsOptions: { shortTermSteps?: boolean } = {},
   ) {
     const problemId = review.problemId;
-    const patch = applyFsrsRating(review, resolveRatingToGrade(rating), now);
+    const patch = applyFsrsRating(review, resolveRatingToGrade(rating), now, fsrsOptions);
     const leech = rating === "again" && this.engine.isLeech({ lapses: patch.lapses }, this.cfg);
     const retired =
       !leech &&
