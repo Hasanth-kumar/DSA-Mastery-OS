@@ -63,6 +63,14 @@ const envSchema = z.object({
   NOTION_WRITE_ENABLED: boolFlag("true"),
   /** When false, Notion pull/push/sync does not run (no Notion network). */
   NOTION_SYNC_ENABLED: boolFlag("true"),
+  // Overhaul feature flags (plan §1). Off when unset so the live app is unchanged.
+  FLAG_TODAY_QUEUE_V2: boolFlag("false"),
+  FLAG_UNIFIED_COMPLETION: boolFlag("false"),
+  FLAG_HIDE_TOPIC_REVISION: boolFlag("false"),
+  FLAG_HELP_LEVEL_CAPTURE: boolFlag("false"),
+  FLAG_TAKEAWAY_FIELD: boolFlag("false"),
+  FLAG_CURRICULUM_V2: boolFlag("false"),
+  FLAG_SPIRAL_PASSES: boolFlag("false"),
   /** Directory for the canonical local card export when Notion cards DB is unset (§10). */
   CARDS_EXPORT_DIR: z.string().default("./data/cards-export"),
   /** Batched card-sync flush interval in ms (§8). 0 disables the timer. */
@@ -208,6 +216,7 @@ export type AppConfig = {
     appSecret?: string;
   };
   sqlite: { path: string };
+  flags: FeatureFlags;
   /** Vite port. The API process does not listen here. */
   frontendPort: number;
   /** No Redis client is constructed. Present so isolation env is explicit. */
@@ -240,6 +249,31 @@ export type AppConfig = {
       escalateDays: number;
     };
   };
+};
+
+/**
+ * Overhaul feature flags, read from `.env` as `FLAG_<NAME>=true|false`.
+ * Unset means off, so merging the overhaul leaves the live app unchanged.
+ */
+export interface FeatureFlags {
+  todayQueueV2: boolean;
+  unifiedCompletion: boolean;
+  /** Topic SM-2 is retired: decisions use problem-FSRS signals (P4.1), and the UI hides it (P4.3). */
+  hideTopicRevision: boolean;
+  helpLevelCapture: boolean;
+  takeawayField: boolean;
+  curriculumV2: boolean;
+  spiralPasses: boolean;
+}
+
+export const FEATURE_FLAGS_OFF: FeatureFlags = {
+  todayQueueV2: false,
+  unifiedCompletion: false,
+  hideTopicRevision: false,
+  helpLevelCapture: false,
+  takeawayField: false,
+  curriculumV2: false,
+  spiralPasses: false,
 };
 
 let cached: AppConfig | null = null;
@@ -307,6 +341,15 @@ export function loadConfig(envPath?: string): AppConfig {
       appSecret: env.WHATSAPP_APP_SECRET,
     },
     sqlite: { path: sqlitePath },
+    flags: {
+      todayQueueV2: env.FLAG_TODAY_QUEUE_V2,
+      unifiedCompletion: env.FLAG_UNIFIED_COMPLETION,
+      hideTopicRevision: env.FLAG_HIDE_TOPIC_REVISION,
+      helpLevelCapture: env.FLAG_HELP_LEVEL_CAPTURE,
+      takeawayField: env.FLAG_TAKEAWAY_FIELD,
+      curriculumV2: env.FLAG_CURRICULUM_V2,
+      spiralPasses: env.FLAG_SPIRAL_PASSES,
+    },
     frontendPort: env.FRONTEND_PORT,
     redis: {
       url: env.REDIS_URL,

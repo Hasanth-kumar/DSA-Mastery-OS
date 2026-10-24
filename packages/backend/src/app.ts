@@ -21,6 +21,7 @@ import { reviewRoutes } from "./routes/review.routes.js";
 import { resolveRoutes } from "./routes/resolve.routes.js";
 import { exportRoutes } from "./routes/export.routes.js";
 import { eventsRoutes } from "./routes/events.routes.js";
+import { flagsRoutes } from "./routes/flags.routes.js";
 import {
   whatsappNotificationRoutes,
   whatsappWebhookRoutes,
@@ -60,6 +61,7 @@ export function buildApp(config: AppConfig, ctx: AppContext) {
     health: "/health",
     api: {
       plan: "GET /api/plan/today",
+      flags: "GET /api/flags",
       curriculum: {
         get: "GET /api/curriculum",
         update: "PUT /api/curriculum",
@@ -146,6 +148,7 @@ export function buildApp(config: AppConfig, ctx: AppContext) {
       await resolveRoutes(instance, ctx);
       await exportRoutes(instance, ctx);
       await eventsRoutes(instance, ctx);
+      await flagsRoutes(instance, ctx);
       await whatsappNotificationRoutes(instance, ctx);
     },
     { prefix: "/api" },

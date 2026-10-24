@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { loadConfig, resetConfigCache } from "./config.js";
+import { FEATURE_FLAGS_OFF, loadConfig, resetConfigCache } from "./config.js";
 
 describe("loadConfig", () => {
   afterEach(() => {
@@ -142,5 +142,36 @@ describe("loadConfig", () => {
       delete process.env.PORT;
       resetConfigCache();
     }
+  });
+
+  describe("feature flags", () => {
+    const keys = [
+      "FLAG_TODAY_QUEUE_V2",
+      "FLAG_UNIFIED_COMPLETION",
+      "FLAG_HIDE_TOPIC_REVISION",
+      "FLAG_HELP_LEVEL_CAPTURE",
+      "FLAG_TAKEAWAY_FIELD",
+      "FLAG_CURRICULUM_V2",
+      "FLAG_SPIRAL_PASSES",
+    ];
+    afterEach(() => {
+      for (const key of keys) delete process.env[key];
+      resetConfigCache();
+    });
+
+    it("are all off when unset, so the live app is unchanged", () => {
+      for (const key of keys) delete process.env[key];
+      resetConfigCache();
+      expect(loadConfig("/nonexistent/.env").flags).toEqual(FEATURE_FLAGS_OFF);
+    });
+
+    it("reads FLAG_<NAME>=true|false and treats an empty value as unset", () => {
+      process.env.FLAG_HIDE_TOPIC_REVISION = "true";
+      process.env.FLAG_TODAY_QUEUE_V2 = "false";
+      process.env.FLAG_SPIRAL_PASSES = "";
+      resetConfigCache();
+      const { flags } = loadConfig("/nonexistent/.env");
+      expect(flags).toEqual({ ...FEATURE_FLAGS_OFF, hideTopicRevision: true });
+    });
   });
 });
