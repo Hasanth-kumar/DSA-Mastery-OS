@@ -19,8 +19,10 @@ export interface ScheduleRepairItem {
  * (e.g. a 30%-confidence topic scheduled for 2030) and propose a corrected
  * schedule. Pure: callers decide whether to apply it.
  *
- * A repaired date is never in the past: overdue repairs land tomorrow, so the
- * compressed daily queue (not a guilt-list) decides the order.
+ * A repaired date is never in the past: a future date beyond the cap whose
+ * allowed date has already passed lands tomorrow, so the compressed daily queue
+ * (not a guilt-list) decides the order. A date already in the past is left as
+ * is, since the topic is already due; only an over-long interval is shortened.
  */
 export function planScheduleRepair(
   topics: TopicState[],
@@ -36,13 +38,20 @@ export function planScheduleRepair(
 
     let newNext = topic.nextRevisionAt;
     let dateTooFar = false;
-    if (topic.nextRevisionAt) {
+    // A date already in the past is due now, not too far out. Moving it to
+    // tomorrow would take due work off today's queue (P2.2), so only future
+    // dates are checked against the cap.
+    if (topic.nextRevisionAt && topic.nextRevisionAt.getTime() > now.getTime()) {
       const base = topic.lastRevised ?? now;
       const latestAllowed = addDays(base, cap);
-      if (topic.nextRevisionAt.getTime() > latestAllowed.getTime()) {
+      const tomorrow = addDays(now, 1);
+      // The repair target is never earlier than tomorrow, so a date at or
+      // before it is never "too far". Without this, a re-run keeps moving a
+      // repaired date forward one day at a time (P2.2).
+      const ceiling = latestAllowed.getTime() > tomorrow.getTime() ? latestAllowed : tomorrow;
+      if (topic.nextRevisionAt.getTime() > ceiling.getTime()) {
         dateTooFar = true;
-        const tomorrow = addDays(now, 1);
-        newNext = latestAllowed.getTime() > tomorrow.getTime() ? latestAllowed : tomorrow;
+        newNext = ceiling;
       }
     }
 

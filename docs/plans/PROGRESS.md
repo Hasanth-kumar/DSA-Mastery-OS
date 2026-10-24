@@ -10,7 +10,7 @@
 | P1.2 | done | 0c66fa9 | SM-2 dependents in verification.md; 7 feed decisions, 10 UI only |
 | P1.3 | done | 738d136 | Today data flow in verification.md; 11 surfaces, 7 duplicates |
 | P2.1 | done | c1f4139 | regression test only; existing 7/21/45/120 caps kept |
-| P2.2 | todo | | local-only (needs dev db) |
+| P2.2 | done | P22SHA | 5 topics repaired on the dev DB; repair made idempotent and leaves due dates alone |
 | P3.1 | done | 61e670b | `problem-progress.ts`; Revision needed = covered; checked on a read-only dev-DB copy |
 | P3.2 | todo | | |
 | P3.3 | todo | | |
@@ -38,6 +38,23 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-24 — P2.2 Run and validate schedule repair on the dev DB
+- Did: Ran `pnpm db:repair-schedules` against a copy of the Desktop worktree's `data/dev/dsa.dev.db` in a cloud checkout, with the overhaul `.env` (dev DB path, Notion writes and sync off, WhatsApp off, mock LLM). Snapshotted with `pnpm dev:snapshot` before applying. Fixed two bugs in `planScheduleRepair` (`packages/intelligence/src/revision-engine/schedule-repair.ts`), with tests. (1) A date already in the past was treated as "too far" whenever `last_revised + cap` was earlier still, and was moved to tomorrow, which takes due work off today's queue (Sorting + Two Pointers, Binary Search + Prefix Sum). Past dates are now left alone; an over-long interval is still shortened. (2) The repair was not idempotent: a repaired date lands on tomorrow, which is still later than `last_revised + cap`, so a re-run flagged the same 4 topics again and would push them one day further each time. A date at or before the repair target is no longer "too far". Wrote `docs/plans/live-migration-steps.md` (backup, stop the app, dry run, apply, verify, rollback).
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (no `pnpm typecheck` script; build typechecks). New: 3 tests in `schedule-repair.test.ts` (already-due date left in place; over-long interval shortened while a due date is kept; idempotent re-run). Mutation check: the previous `schedule-repair.ts` fails all 3. The health test again created `data/sqlite/dsa.db`, which I deleted.
+- Data check (before → after, `pnpm dev:metrics`, dev DB only):
+
+  | Topic | Confidence | Interval | Next review |
+  |---|---|---|---|
+  | Recursion & Backtracking | 32 | 3900 → 7 | 2037-03-09 → 2026-10-25 |
+  | Fast & Slow Pointers | 30 | 1459 → 7 | 2030-10-09 → 2026-10-25 |
+  | Two Pointers | 53 | 456 → 21 | 2027-12-19 → 2026-10-25 |
+  | BFS | 22 | 380 → 7 | 2027-09-17 → 2026-10-25 |
+  | Binary Search + Prefix Sum | 43 | 42 → 21 | 2026-10-19 (unchanged, already due) |
+
+  Acceptance: 10 started topics, 7 with confidence < 40. Every one is due within 14 days (or has no date, which counts as due), and none exceeds its confidence cap. A second `pnpm db:repair-schedules` prints "Nothing to do". Other metrics unchanged: 39 sessions, 1618 minutes, 51 attempts, 33 `problem_reviews` (21 due), pin still Greedy Sorting.
+- Surprises / plan corrections: **Test hygiene bug (fixed, commit `72791d4`).** Five backend tests set `SQLITE_PATH` to a temp file and then call `loadConfig()`, which loads the repo `.env`. Since P0.1, `DSA_DB_PATH` wins over `SQLITE_PATH`, so in the Desktop worktree (which has the overhaul `.env`) `pnpm test` wrote to `data/dev/dsa.dev.db`. Earlier runs had no `.env`, so it never showed. It showed here as 18 failures and 3 stray attempts in the cloud copy. That copy was restored from the snapshot before the repair was applied; the Desktop dev DB was never involved. The tests now pin `DSA_DB_PATH` too, and after a full `pnpm test` with the `.env` present the dev DB is byte-identical. `health.test.ts` ([Q-health-test]) is a separate case and is still waiting on Santosh.
+- Next suggested task: P3.2
+
 ### 2026-10-24 — P3.1 One definition of "covered" vs "mastered"
 - Did: Added `packages/intelligence/src/problem-progress.ts`. `isFirstPassCovered` is `Solved` or `Revision needed`. `isRemainingFirstPass` is everything else, which with normalized statuses means `Not started` or a null status. `buildTopicProblemCounts` builds the curriculum's per-topic totals from it. `CurriculumService.buildProblemCounts` now calls `buildTopicProblemCounts`. `ProblemRepository.findUnsolvedByTopicId` is replaced by `findRemainingFirstPassByTopicId`, which filters with `isRemainingFirstPass` (same Easy → Medium → Hard order, same limit). `ProblemSuggestionService` uses it. The old SQL `status = 'Not started'` filter and the `status !== "Solved"` count are gone. The curriculum's `unsolved` field keeps its name and now means "remaining in the first pass".
 - Same session, before P3.1: Santosh decided how Today should look with `todayQueueV2`. A due re-solve is the first, marked row of the Suggested problems list. It logs exactly like a new problem (Start → timer → ✓ Done → MistakeCapture). The separate Re-solve section, topic Revision column, post-solve revision offer and FocusCard are hidden. D8 answered: 1 re-solve per day. Recorded in the design doc §3.3, plan P4.2 / P5.2 (renamed "Render the queue in the Suggested problems list") / P5.4, and QUESTIONS.md (commit `d82b116`).

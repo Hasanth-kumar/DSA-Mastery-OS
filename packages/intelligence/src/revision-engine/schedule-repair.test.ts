@@ -31,6 +31,42 @@ describe("planScheduleRepair", () => {
     expect(item.newNextRevisionAt!.getTime()).toBeGreaterThan(now.getTime());
   });
 
+  it("leaves an already-due date in place (P2.2)", () => {
+    const overdue = makeTopic({
+      id: "stp", name: "Sorting + Two Pointers", confidence: 4,
+      lastRevised: new Date("2026-09-20T00:00:00Z"),
+      nextRevisionAt: new Date("2026-10-15T04:00:00Z"),
+      sm2Interval: 1,
+    });
+    expect(planScheduleRepair([overdue], now)).toEqual([]);
+  });
+
+  it("shortens an over-long interval but keeps an already-due date (P2.2)", () => {
+    const due = new Date("2026-10-15T12:01:27Z");
+    const t = makeTopic({
+      id: "bsps", name: "Binary Search + Prefix Sum", confidence: 43,
+      lastRevised: new Date("2026-07-29T00:00:00Z"),
+      nextRevisionAt: due,
+      sm2Interval: 42,
+    });
+    const [item] = planScheduleRepair([t], now);
+    expect(item.newIntervalDays).toBe(21);
+    expect(item.newNextRevisionAt).toEqual(due);
+  });
+
+  it("is idempotent: a repaired topic is not repaired again on a re-run (P2.2)", () => {
+    const t = makeTopic({
+      id: "rb", name: "Recursion", confidence: 32,
+      lastRevised: new Date("2026-07-05T10:00:00Z"),
+      nextRevisionAt: new Date("2037-03-09T00:00:00Z"),
+      sm2Interval: 3900,
+    });
+    const [item] = planScheduleRepair([t], now);
+    const repaired = { ...t, sm2Interval: item.newIntervalDays, nextRevisionAt: item.newNextRevisionAt };
+    expect(planScheduleRepair([repaired], now)).toEqual([]);
+    expect(planScheduleRepair([repaired], addDays(now, 0.5))).toEqual([]);
+  });
+
   it("leaves healthy and not-started topics alone", () => {
     const ok = makeTopic({
       id: "ok", name: "OK", confidence: 90, sm2Interval: 30,
