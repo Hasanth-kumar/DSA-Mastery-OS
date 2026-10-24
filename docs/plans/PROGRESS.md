@@ -11,7 +11,7 @@
 | P1.3 | done | 738d136 | Today data flow in verification.md; 11 surfaces, 7 duplicates |
 | P2.1 | done | c1f4139 | regression test only; existing 7/21/45/120 caps kept |
 | P2.2 | todo | | local-only (needs dev db) |
-| P3.1 | done | P31SHA | `problem-progress.ts`; Revision needed = covered; checked on a read-only dev-DB copy |
+| P3.1 | done | 61e670b | `problem-progress.ts`; Revision needed = covered; checked on a read-only dev-DB copy |
 | P3.2 | todo | | |
 | P3.3 | todo | | |
 | P3.4 | todo | | |
