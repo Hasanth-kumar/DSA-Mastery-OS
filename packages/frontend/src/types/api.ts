@@ -14,6 +14,7 @@ import type {
   ResolvePlanSlot,
   ResolveRating,
   RevisionProblem,
+  TodayQueue,
   TopicDifficulty,
   TopicStatus,
   WeaknessTrendPoint,
@@ -32,6 +33,7 @@ export type {
   ResolveRating,
   RevisionProblem,
   StreakInfo,
+  TodayQueue,
   TopicDifficulty,
   TopicDifficultyAlignment,
   TopicStatus,
@@ -145,6 +147,8 @@ export interface StudyPlan {
   resolveSlots?: ResolvePlanSlot[];
   resolveTotalDue?: number;
   resolveDeferred?: number;
+  /** P5.1: Today's single ordered list of problems (`todayQueueV2`). */
+  queue?: TodayQueue;
 }
 
 export type ResolveOutcomeKind = "solved" | "assisted" | "failed";

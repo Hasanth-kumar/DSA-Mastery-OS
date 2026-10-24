@@ -3357,3 +3357,30 @@ button.settings-row {
 .problem-row-v2--locked button:disabled {
   cursor: not-allowed;
 }
+
+/* P5.2: the re-solve row in the Today queue — a mono kicker and its reason. */
+.problem-row-kicker {
+  padding-left: 80px;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.problem-row-reason {
+  padding-left: 80px;
+  margin: 6px 0 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* P5.3: the decision line under the hero reason. */
+.focus-hero-decision {
+  margin: -16px 0 24px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-subtle);
+}

@@ -42,7 +42,10 @@ export interface ChatLearningContext {
   streakDays?: number;
   problem?: {
     name: string;
-    topicName: string;
+    /** Absent when `patternHidden`. */
+    topicName?: string;
+    /** P5.2: the learner is practising recognition; never name the pattern unprompted. */
+    patternHidden?: boolean;
     difficulty: string;
     attempts: number;
     status: string;

@@ -39,6 +39,8 @@ export interface SendChatInput {
   message: string;
   problemId?: string;
   includeContext?: boolean;
+  /** P5.2: anchored from a hidden-pattern row on Today — keep the pattern out of the context. */
+  hidePattern?: boolean;
   directMode?: boolean;
   /** Coach model id (from listModels); falls back to the configured default. */
   model?: string;
@@ -267,6 +269,8 @@ export class ChatService {
       threadId: string;
       problemId?: string;
       includeContext?: boolean;
+      /** P5.2: anchored from a hidden-pattern row on Today — keep the pattern out of the context. */
+      hidePattern?: boolean;
       directMode?: boolean;
       model?: string;
     },
@@ -322,6 +326,8 @@ export class ChatService {
       content: string;
       problemId?: string;
       includeContext?: boolean;
+      /** P5.2: anchored from a hidden-pattern row on Today — keep the pattern out of the context. */
+      hidePattern?: boolean;
       directMode?: boolean;
       model?: string;
     },
@@ -404,13 +410,19 @@ export class ChatService {
    */
   private async resolveContext(input: {
     includeContext?: boolean;
+    /** P5.2: anchored from a hidden-pattern row on Today — keep the pattern out of the context. */
+    hidePattern?: boolean;
     problemId?: string;
   }): Promise<ChatLearningContext | null> {
-    if (input.includeContext) return this.buildLearningContext(input.problemId);
-    return input.problemId ? this.buildProblemOnlyContext(input.problemId) : null;
+    const hide = input.hidePattern === true;
+    if (input.includeContext) return this.buildLearningContext(input.problemId, hide);
+    return input.problemId ? this.buildProblemOnlyContext(input.problemId, hide) : null;
   }
 
-  private async buildLearningContext(problemId?: string): Promise<ChatLearningContext> {
+  private async buildLearningContext(
+    problemId?: string,
+    hidePattern = false,
+  ): Promise<ChatLearningContext> {
     const now = Date.now();
     if (
       !problemId &&
@@ -447,7 +459,7 @@ export class ChatService {
     };
 
     if (problemId) {
-      const problemCtx = await this.buildProblemOnlyContext(problemId);
+      const problemCtx = await this.buildProblemOnlyContext(problemId, hidePattern);
       if (problemCtx?.problem) {
         ctx.problem = problemCtx.problem;
       }
@@ -463,6 +475,7 @@ export class ChatService {
 
   private async buildProblemOnlyContext(
     problemId: string,
+    hidePattern = false,
   ): Promise<ChatLearningContext | null> {
     const problem = this.problemRepo.findById(problemId);
     if (!problem?.topicId) return null;
@@ -487,6 +500,22 @@ export class ChatService {
     const note = noteRow?.content
       ? stripWikiLinks(noteRow.content).trim().slice(0, 4000)
       : undefined;
+
+    // P5.2: a hidden-pattern row — the problem, its own history and nothing that
+    // names or hints the pattern (topic name, topic-level signals, the note).
+    if (hidePattern) {
+      return {
+        problem: {
+          name: problem.name,
+          patternHidden: true,
+          difficulty: problem.difficulty ?? "Medium",
+          attempts: problem.attempts ?? 0,
+          status: problem.status ?? "Not started",
+          confidence: topic.confidence,
+          solveHistory: solveHistory && solveHistory.length > 0 ? solveHistory : undefined,
+        },
+      };
+    }
 
     return {
       problem: {

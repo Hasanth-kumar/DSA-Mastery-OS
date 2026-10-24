@@ -56,6 +56,8 @@ const SHORTCUTS: { key: string; action: string }[] = [
 export function App() {
   const [tab, setTab] = useState<AppTab>("today");
   const [coachAnchorId, setCoachAnchorId] = useState<string | null>(null);
+  // P5.2: opened from a row whose pattern is hidden — the coach keeps it hidden.
+  const [coachHidePattern, setCoachHidePattern] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const { theme, toggleTheme, accentGlow } = useAppPreferences();
   const navMeta = useNavMeta(tab, coachAnchorId);
@@ -99,8 +101,9 @@ export function App() {
   }, []);
 
   const openCoach = useCallback(
-    (problemId: string) => {
+    (problemId: string, options?: { hidePattern?: boolean }) => {
       setCoachAnchorId(problemId || null);
+      setCoachHidePattern(options?.hidePattern === true);
       selectTab("coach");
     },
     [selectTab],
@@ -162,7 +165,7 @@ export function App() {
         {accentGlow && <div className="main-accent-glow" aria-hidden />}
         <Suspense fallback={<SkeletonPage />}>
           {tab === "coach" ? (
-            <CoachingPage anchorProblemId={coachAnchorId} />
+            <CoachingPage anchorProblemId={coachAnchorId} anchorHidePattern={coachHidePattern} />
           ) : (
             <div key={tab} className="page-transition">
               {tab === "today" && <TodayPage onOpenCoach={openCoach} />}

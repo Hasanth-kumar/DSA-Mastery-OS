@@ -134,6 +134,22 @@ describe("Today queue (P5.1)", () => {
     expect(attempt).toMatchObject({ topicId: "t-other", kind: "resolve" });
   });
 
+  it("a coach anchored from a hidden row gets no pattern in its context", async () => {
+    const { ctx } = setup(true);
+    type Resolve = (input: { problemId?: string; includeContext?: boolean; hidePattern?: boolean }) => Promise<unknown>;
+    const resolveContext = (ctx.chatService as unknown as { resolveContext: Resolve }).resolveContext.bind(ctx.chatService);
+
+    const hidden = JSON.stringify(await resolveContext({ problemId: "r1", includeContext: false, hidePattern: true }));
+    expect(hidden).toContain("Longest Repeating Character Replacement");
+    expect(hidden).not.toContain("Sliding Window");
+
+    const withPlan = JSON.stringify(await resolveContext({ problemId: "r1", includeContext: true, hidePattern: true }));
+    expect(withPlan).not.toContain("Sliding Window");
+
+    const shown = JSON.stringify(await resolveContext({ problemId: "r1", includeContext: false }));
+    expect(shown).toContain("Sliding Window");
+  });
+
   it("flag off: no queue, and the dashboard still embeds the plan", async () => {
     const { app } = setup(false);
     expect((await getPlan(app)).queue).toBeUndefined();

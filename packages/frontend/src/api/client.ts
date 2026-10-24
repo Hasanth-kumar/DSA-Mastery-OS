@@ -223,7 +223,8 @@ export const api = {
     ),
 
   logSession: (body: {
-    topicId: string;
+    /** Optional when problemId is set: the backend uses the problem's topic (P5.1). */
+    topicId?: string;
     problemId?: string;
     problemsSolved?: number;
     studyDuration: number;
