@@ -14,7 +14,7 @@
 | P3.1 | done | 61e670b | `problem-progress.ts`; Revision needed = covered; checked on a read-only dev-DB copy |
 | P3.2 | done | 0e23b5a | 5 missing rows backfilled on the dev DB; script with --revert |
 | P3.3 | done | 4b98ddb | 7-day / first-pass pin expiry; Pinned · Unpin on Today; dev pin cleared |
-| P3.4 | done | P34SHA | pin > current topic > highest-priority ready topic; label + edge matching fixed |
+| P3.4 | done | 4336eb3 | pin > current topic > highest-priority ready topic; label + edge matching fixed |
 | P3.5 | todo | | |
 | P4.1 | todo | | |
 | P4.2 | todo | | |
