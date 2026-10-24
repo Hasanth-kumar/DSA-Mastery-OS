@@ -12,7 +12,7 @@
 | P2.1 | done | c1f4139 | regression test only; existing 7/21/45/120 caps kept |
 | P2.2 | done | c5b7ef1 | 5 topics repaired on the dev DB; repair made idempotent and leaves due dates alone |
 | P3.1 | done | 61e670b | `problem-progress.ts`; Revision needed = covered; checked on a read-only dev-DB copy |
-| P3.2 | done | P32SHA | 5 missing rows backfilled on the dev DB; script with --revert |
+| P3.2 | done | 0e23b5a | 5 missing rows backfilled on the dev DB; script with --revert |
 | P3.3 | todo | | |
 | P3.4 | todo | | |
 | P3.5 | todo | | |
