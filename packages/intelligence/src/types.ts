@@ -38,6 +38,13 @@ export interface TopicState {
   coachAssist?: { assisted: number; solved: number };
   /** The topic's most recent attempt was tagged could-not-solve (P3.5). */
   lastAttemptCouldNotSolve?: boolean;
+  /**
+   * Due dates of the topic's active re-solves (`problem_reviews`, not retired or
+   * suspended; null = not yet scheduled). Present only when topic SM-2 is retired
+   * (`hideTopicRevision`, P4.1): urgency then comes from problem FSRS, not
+   * `nextRevisionAt`. Undefined keeps the SM-2 rule.
+   */
+  resolveDueAt?: (Date | null)[];
 }
 
 /** One-tap mistake taxonomy captured after logging a problem. */

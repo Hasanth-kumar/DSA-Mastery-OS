@@ -1,4 +1,19 @@
 import type { PriorityScore, TopicState } from "../types.js";
+import { summarizeResolveDue } from "./resolve-urgency.js";
+
+function urgencyReason(topic: TopicState, urgency: number, now = new Date()): string {
+  if (topic.resolveDueAt) {
+    if (!topic.lastRevised && topic.resolveDueAt.length === 0) {
+      return "never studied — maximum urgency";
+    }
+    const { dueCount, maxDaysOverdue } = summarizeResolveDue(topic.resolveDueAt, now);
+    if (dueCount === 0) return "no re-solve due";
+    const late = maxDaysOverdue > 0 ? `, the oldest ${maxDaysOverdue} days overdue` : "";
+    return `${dueCount} re-solve${dueCount === 1 ? "" : "s"} due${late}`;
+  }
+  if (!topic.lastRevised) return "never studied — maximum urgency";
+  return urgency > 0.5 ? "revision is overdue" : "revision not yet due";
+}
 
 export function explainPriorityScore(
   score: PriorityScore,
@@ -16,13 +31,7 @@ export function explainPriorityScore(
   const b = score.breakdown;
   const explanation = [
     `Topic "${topic.name}" has a priority score of ${score.total.toFixed(1)}/100 (${score.recommendation}).`,
-    `Urgency (${(b.urgency * 100).toFixed(0)}%): ${
-      !topic.lastRevised
-        ? "never studied — maximum urgency"
-        : b.urgency > 0.5
-          ? "revision is overdue"
-          : "revision not yet due"
-    }.`,
+    `Urgency (${(b.urgency * 100).toFixed(0)}%): ${urgencyReason(topic, b.urgency)}.`,
     `Weakness (${(b.weakness * 100).toFixed(0)}%): ${
       topic.isWeakArea
         ? "flagged weak area"

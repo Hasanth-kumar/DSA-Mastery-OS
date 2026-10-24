@@ -89,7 +89,9 @@ export function createAppContext(
   runMigrations(config.sqlite.path);
   const { db, sqlite } = createSqliteDb(config.sqlite.path);
 
-  const mirrorCache = new MirrorCache(db);
+  const mirrorCache = new MirrorCache(db, undefined, {
+    resolveUrgency: config.flags.hideTopicRevision,
+  });
   const topicRepo = new TopicRepository(db, mirrorCache);
   const problemRepo = new ProblemRepository(db, mirrorCache);
   const sessionRepo = new SessionRepository(db, mirrorCache);

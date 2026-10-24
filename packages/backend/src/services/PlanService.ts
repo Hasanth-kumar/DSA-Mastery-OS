@@ -138,8 +138,10 @@ export class PlanService {
 
     let reasoning = selection.reasoning;
     if (primaryScore.memoryExecutionDivergence) {
-      reasoning +=
-        " Recall looks fine but execution is weak — practice anyway despite a far-out review date.";
+      // P4.1 (F5): under FSRS urgency there is no review date to point at.
+      reasoning += primaryTopic.resolveDueAt
+        ? " No re-solve is due, but execution is still weak — practice anyway."
+        : " Recall looks fine but execution is weak — practice anyway despite a far-out review date.";
     }
     for (const slot of resolveSlots.filter((s) => s.promoted)) {
       reasoning += ` Re-solve promoted: ${slot.name} is ${slot.daysOverdue} days overdue.`;

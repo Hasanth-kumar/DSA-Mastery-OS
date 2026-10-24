@@ -1,5 +1,12 @@
-import { desc, gte, isNotNull, sql } from "drizzle-orm";
-import { notes, problemAttempts, problems, sessions, topics } from "@dsa/database/schema";
+import { and, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
+import {
+  notes,
+  problemAttempts,
+  problemReviews,
+  problems,
+  sessions,
+  topics,
+} from "@dsa/database/schema";
 import { buildTopicState, groupBy, type TopicState } from "@dsa/intelligence";
 import type { SqliteDb } from "@dsa/integrations";
 import type { ProblemRow } from "../repositories/ProblemRepository.js";
@@ -19,6 +26,14 @@ interface MirrorSnapshot {
   loadedAt: number;
 }
 
+export interface MirrorCacheOptions {
+  /**
+   * Topic SM-2 retired (`hideTopicRevision`, P4.1): give each topic the due dates
+   * of its active re-solves so urgency comes from problem FSRS.
+   */
+  resolveUrgency?: boolean;
+}
+
 export class MirrorCache {
   private snapshot: MirrorSnapshot | null = null;
   private batchDepth = 0;
@@ -27,6 +42,7 @@ export class MirrorCache {
   constructor(
     private readonly db: SqliteDb,
     private readonly ttlMs = 10_000,
+    private readonly options: MirrorCacheOptions = {},
   ) {}
 
   invalidate(): void {
@@ -88,6 +104,7 @@ export class MirrorCache {
     const notedProblemIds = this.loadNotedProblemIds();
     const coachAssistByTopic = this.loadCoachAssist();
     const couldNotSolveTopics = this.loadLastAttemptCouldNotSolve();
+    const resolveDueByTopic = this.options.resolveUrgency ? this.loadResolveDueAt() : null;
 
     const topicStates = topicRows.map((topic) =>
       buildTopicState(
@@ -99,6 +116,9 @@ export class MirrorCache {
           notedProblemIds,
           coachAssist: coachAssistByTopic.get(topic.id),
           lastAttemptCouldNotSolve: couldNotSolveTopics.has(topic.id),
+          ...(resolveDueByTopic
+            ? { resolveDueAt: resolveDueByTopic.get(topic.id) ?? [] }
+            : {}),
         },
       ),
     );
@@ -195,6 +215,24 @@ export class MirrorCache {
       if (!row.topicId || seen.has(row.topicId)) continue;
       seen.add(row.topicId);
       if (parseMistakeTags(row.mistakeTag).includes("could-not-solve")) result.add(row.topicId);
+    }
+    return result;
+  }
+
+  /** Due dates of active (not retired, not suspended) re-solves, by topic (P4.1). */
+  private loadResolveDueAt(): Map<string, (Date | null)[]> {
+    const rows = this.db
+      .select({ topicId: problems.topicId, due: problemReviews.due })
+      .from(problemReviews)
+      .innerJoin(problems, eq(problems.id, problemReviews.problemId))
+      .where(and(eq(problemReviews.retired, 0), eq(problemReviews.suspended, 0)))
+      .all();
+    const result = new Map<string, (Date | null)[]>();
+    for (const row of rows) {
+      if (!row.topicId) continue;
+      const list = result.get(row.topicId) ?? [];
+      list.push(row.due == null ? null : new Date(row.due));
+      result.set(row.topicId, list);
     }
     return result;
   }

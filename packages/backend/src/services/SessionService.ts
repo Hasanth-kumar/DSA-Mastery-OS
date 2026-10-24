@@ -317,7 +317,10 @@ export class SessionService {
     const status = deriveTopicStatusAfterSession(topic.status, confidence, weaknessUpdate.isWeak);
     const difficulty = deriveTopicDifficultyFromConfidence(confidence);
     const nextRevisionAt = fullUpdate ? fullUpdate.sm2.nextRevisionAt : topic.nextRevisionAt;
-    const revisionCount = skipScheduling ? topic.revisionCount : topic.revisionCount + 1;
+    // P4.1 (F6): with topic SM-2 retired, a graded warm-up no longer stops the
+    // session from counting toward `revision_count`, which weakness reads.
+    const countsAsRevision = !skipScheduling || this.config.flags.hideTopicRevision;
+    const revisionCount = countsAsRevision ? topic.revisionCount + 1 : topic.revisionCount;
 
     const topicSnapshot: TopicSyncSnapshot = {
       confidence,
