@@ -34,10 +34,30 @@
 | P7.4 | done | 3ffc657 | `two-loop-selector.ts`; 18 scenario tests; dev-DB run: DP (1D) block + one basic a day |
 | P7.5 | done | bb84c82 | two-loop queue behind `curriculumV2` + `spiralPasses` (+ `todayQueueV2`); `pnpm dev:simulate-plan` |
 | P8.1 | done | fcdebbd | `live-migration-steps.md`: 10 sections, flags in 3 groups, queries checked on a dev copy |
-| P8.2 | todo | | |
+| P8.2 | done | 6421064 | runbook dry-run on a 2026-10-25 live copy; D14 found and fixed |
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-25 — P8.2 Dry-run the runbook on a fresh copy of the live DB
+- Santosh asked to do P8.2 and wrap up Phase 8, and allowed reading the live DB. Copied `~/Desktop/dsa-mastery-os/data/sqlite/dsa.db` (app stopped, no WAL; checksum `fb2855f6…`) into a Linux build copy of `overhaul`, with an `.env` holding no tokens: dev path, Notion sync and writes off, WhatsApp off, mock LLM, schedulers off.
+- Ran every runbook step on the copy:
+  - **Before:** 50 / 291 / 66 / 45 / 39 / 40 (topics / problems / attempts / sessions / reviews / cards), integrity `ok`, 4 runaway schedules, 5 unpooled `Revision needed`, pinned to Greedy + Sorting with Prefix.
+  - **Step 3:** migration 0017 applied on first open (four columns).
+  - **Step 4:** dry run listed **6** topics (Greedy Sorting 49 → 7 days is new since the dev copy); `--apply` backed up and applied; re-run "Nothing to do"; 6 pending Notion pushes.
+  - **Step 5:** 5 added (39 → 44); `--revert` → 39; `--apply` → 44.
+  - **Step 6:** flags all off; `/api/flags` all false; health ok except Notion (no token in the dry run); unpin via `PUT /api/curriculum/active` → hero DFS (Tree/Graph) (2 covered on live); 8.6 empty.
+  - **Group A:** revision topics gone, one Today list (hidden re-solve, two DFS problems).
+  - **Group B:** a logged solve stored help level, source and takeaway; `used_coach` derived; no vault note, so nothing appended.
+  - **Group C:** see below.
+  - **Rollback level 3:** `main` at `f60c5dc` built and booted on the fully migrated copy and served Today with no errors; the 0017 down script dropped exactly the four columns, kept all 66 attempts, integrity `ok` (SQLite 3.37).
+- **Found (D14):** live has 4 non-basic patterns started before the selector and still mid-block: DFS, Prefix Sum, Binary Search + Greedy (last attempt July) and Greedy + Sorting with Prefix (yesterday). The selector ran their blocks first, so DP (1D) started on day 8, against D13; and Binary Search + Greedy ran though Binary Search is below pass 1. Asked Santosh; he chose "Finish recent, mix stale". `two-loop-selector.ts`: a block with a gap of 14+ days between its attempts (or since the last) is interrupted for good, and its pass-1 problems join mixed days, hidden. A first version only looked at the gap since the last attempt, and the simulation showed DFS reviving as a shown block the day after a hidden DFS problem; fixed. A started pattern (block or mixed) is served only once its hard prerequisites are at pass ≥ 1. Tests: +3 scenarios (interrupted block → DP starts, the old pattern joins mixed days and doesn't revive; recent and interrupted patterns both wait for a prerequisite). Mutation checks (4): ignoring staleness, the pool or a running block ignoring prerequisites, only the last gap counting. Each fails a test; restored.
+- **Group C after the fix:** Today day 1 = "New pattern: Dynamic Programming (1D)", Climbing Stairs shown, Contains Duplicate II (basics) hidden, Word Search re-solve hidden. 14-day simulation: DP block days 1–4, then mixed days with DFS and Prefix Sum hidden, Greedy + Sorting with Prefix's last block problem on day 12 once Prefix Sum reaches pass 1; Binary Search + Greedy waits. After 14 days: passes 41 / 9 / 0 / 0. Old path over the same days: DFS 6 days, Sliding Window 6, then Heap (two Hards) and Trie.
+- Runbook updated with the live numbers (6 repaired topics, the pin's real name, DFS after unpin, Notion in health, the copy-back `-wal` warning, rollback level 3 results, the group C expectation) and a dry-run note at the top. Query 8.4 now uses each topic's confidence cap: the flat 120-day check missed 2 of the 6.
+- Also found: a stale `-wal` beside a restored copy replays old writes (it replayed a test solve here). The runbook now says to delete `-wal`/`-shm` before every copy-back.
+- Live file: only read. Its checksum changed at 08:12 UTC because Santosh's own live app ran (`.study/backend.log` on the Mac: Notion sync pulled 3 new problems, deferred 9 re-solves, backup, shutdown); no overhaul change is in it (no 0017 columns).
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (shared 23, intelligence 276, integrations 200, backend 162).
+- Next suggested task: P8.3.
+
 ### 2026-10-25 — P8.1 Live migration runbook
 - Santosh: "Lets go ahead with it" after P7.5, read as: keep D13's three-problem day (~105 min when all Medium) and start P8.1.
 - Did: completed `docs/plans/live-migration-steps.md`. At-a-glance table; preconditions (P8.2 done, live `main` clean, `overhaul` pushed, live `.env` free of worktree overrides); what lands with every flag off (`bb8cfb6` outcome scoring, P3.1 covered rule, P3.3 pin expiry, P3.4 topic choice, P3.5 stage difficulty, P6.3 tags, Graph edges); stop + backup (DB, WAL, the pre-merge commit, the vault before `takeawayField`); `git merge --no-ff origin/overhaul` so one `git revert -m 1` undoes it; migration 0017 (runs by itself; no migrations table, every file re-runs on open); P2.2 repair; P3.2 backfill; first start with flags off + P3.3 unpin; the seven flags in three groups (A: hideTopicRevision, unifiedCompletion, todayQueueV2; B: helpLevelCapture, takeawayField; C: curriculumV2, spiralPasses), each with what changes, what it writes and what turning it off leaves; eight verification checks; rollback at three levels (flag, data step, whole merge with keep-data or restore-backup).
