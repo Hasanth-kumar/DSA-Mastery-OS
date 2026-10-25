@@ -35,6 +35,7 @@ pnpm lint             # ESLint across packages
 
 pnpm dev:snapshot     # copy data/dev/dsa.dev.db to data/dev/snapshots/<timestamp>.db
 pnpm dev:reset        # restore data/dev/dsa.dev.db from the pristine baseline
+pnpm dev:simulate-plan --days 14  # old curriculum vs two-loop selector, day by day, on a copy of the dev DB
 
 pnpm db:seed          # Notion -> SQLite initial sync (topics/problems/sessions)
 pnpm db:seed-cards    # load seed flashcards from database/seeds

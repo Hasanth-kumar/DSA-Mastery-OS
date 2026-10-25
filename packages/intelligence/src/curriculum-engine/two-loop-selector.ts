@@ -261,8 +261,8 @@ export function selectTwoLoopDay(
         used.add(p.topicId);
       }
     };
-    add(guardPick(used));
     if (consolidating) {
+      add(guardPick(used));
       // Lowest pass first, basics first, then the intro order; prerequisites below pass 2 first.
       const targets = views
         .filter((v) => (v.basic || core.includes(v)) && v.pass.pass < 2 && v.topic.problems.length > 0)
@@ -283,8 +283,14 @@ export function selectTwoLoopDay(
       }
       return picks;
     }
-    const pool = views.filter((v) => isOpen(v) && !v.basic && v.introduced && blockOf(v).done && pass1Next(v).length > 0);
-    for (const v of [...pool].sort(byRecency)) add(pick(pass1Next(v)[0], v, "pool", false));
+    // D13's typical day: one problem from an open pattern, then the basics
+    // offer (Today keeps the offer past its budget), then the rest.
+    const pool = views
+      .filter((v) => isOpen(v) && !v.basic && v.introduced && blockOf(v).done && pass1Next(v).length > 0)
+      .sort(byRecency);
+    if (pool[0]) add(pick(pass1Next(pool[0])[0], pool[0], "pool", false));
+    add(guardPick(used));
+    for (const v of pool) add(pick(pass1Next(v)[0], v, "pool", false));
     const transfer = views
       .filter((v) => v.pass.pass >= 1 && v.pass.pass < 2 && v.pass.pass2.transferClean < v.pass.pass2.transferNeeded)
       .filter((v) => unseen(v).length > 0)

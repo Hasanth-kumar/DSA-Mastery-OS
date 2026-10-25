@@ -11,7 +11,8 @@
     "test": "vitest run",
     "lint": "eslint src",
     "db:backfill-resolve-pool": "tsx src/scripts/backfill-resolve-pool.ts",
-    "db:repair-schedules": "tsx src/scripts/repair-topic-schedules.ts"
+    "db:repair-schedules": "tsx src/scripts/repair-topic-schedules.ts",
+    "dev:simulate-plan": "tsx src/scripts/simulate-plan.ts"
   },
   "dependencies": {
     "@dsa/database": "workspace:*",

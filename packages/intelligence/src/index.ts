@@ -65,7 +65,15 @@ export { suggestionSlots } from "./difficulty-engine/DifficultyEngine.js";
 export { maxIntervalDaysForConfidence } from "./revision-engine/sm2.js";
 export { planScheduleRepair, type ScheduleRepairItem } from "./revision-engine/schedule-repair.js";
 export { buildFocusPlan, type FocusInput } from "./focus-engine/FocusPlanner.js";
-export { buildTodayQueue, type TodayQueueInput } from "./focus-engine/TodayQueue.js";
+export { buildTodayQueue, type TodayQueueInput, type TodayQueuePick } from "./focus-engine/TodayQueue.js";
+export type { PassAttempt, PassReview } from "./curriculum-engine/topic-pass.js";
+export {
+  selectTwoLoopDay,
+  type PickRole,
+  type SelectorTopic,
+  type TwoLoopDay,
+  type TwoLoopInput,
+} from "./curriculum-engine/two-loop-selector.js";
 export { buildTopicGraphEdges } from "./roadmap-engine/graph-edges.js";
 export {
   BASIC_TOPICS,

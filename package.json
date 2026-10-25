@@ -30,7 +30,8 @@
     "setup": "bash infrastructure/scripts/setup.sh",
     "dev:snapshot": "node infrastructure/scripts/dev-db.mjs snapshot",
     "dev:reset": "node infrastructure/scripts/dev-db.mjs reset",
-    "dev:metrics": "node --disable-warning=ExperimentalWarning infrastructure/scripts/dev-metrics.mjs"
+    "dev:metrics": "node --disable-warning=ExperimentalWarning infrastructure/scripts/dev-metrics.mjs",
+    "dev:simulate-plan": "pnpm --filter @dsa/backend dev:simulate-plan"
   },
   "engines": {
     "node": ">=20"

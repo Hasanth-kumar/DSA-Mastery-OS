@@ -144,6 +144,19 @@ describe("ProblemReviewEngine.selectDueSlots (§6)", () => {
     expect(deferred).toEqual([{ review: pool[0], due: now + MS_PER_DAY }]);
   });
 
+  it("P7.5: preferred problems fill the slots first, still most overdue first; not-due ones stay out", () => {
+    const pool = [
+      review("fresh", { due: now - 1 * MS_PER_DAY }),
+      review("rusty", { due: now - 5 * MS_PER_DAY }),
+      review("rustiest", { due: now - 9 * MS_PER_DAY }),
+      review("not-due", { due: now + MS_PER_DAY }),
+    ];
+    const prefer = new Set(["fresh", "rusty", "not-due"]);
+    const { active, deferred } = engine.selectDueSlots(pool, 1, now, undefined, prefer);
+    expect(active.map((s) => s.review.problemId)).toEqual(["rusty"]);
+    expect(deferred.map((d) => d.review.problemId)).toEqual(["fresh", "rustiest"]);
+  });
+
   it("spreads a large backlog forward at capacity per day", () => {
     const pool = Array.from({ length: 6 }, (_, i) =>
       review(`p${i}`, { due: now - (i + 1) * MS_PER_DAY }),

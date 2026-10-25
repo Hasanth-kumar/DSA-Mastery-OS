@@ -225,16 +225,21 @@ export class ProblemReviewEngine {
    * tomorrow (compressQueue semantics — never a guilt-list). The escalation
    * valve promotes at most ONE extra problem past capacity (even capacity 0)
    * when it is overdue beyond `escalateDays`.
+   *
+   * `prefer` (P7.5): due problems in this set fill the slots first, most
+   * overdue first, so a consolidation day leads with its topic's re-solves.
    */
   selectDueSlots(
     pool: ProblemReviewState[],
     capacity: number,
     now: number,
     config: ProblemReviewConfig = DEFAULT_PROBLEM_REVIEW_CONFIG,
+    prefer?: ReadonlySet<string>,
   ): SlotSelection {
+    const preferred = (p: ProblemReviewState) => (prefer?.has(p.problemId) ? 0 : 1);
     const due = pool
       .filter((p) => !p.retired && !p.suspended && p.due != null && p.due <= now)
-      .sort((a, b) => a.due! - b.due!);
+      .sort((a, b) => preferred(a) - preferred(b) || a.due! - b.due!);
 
     const daysOverdue = (p: ProblemReviewState) => Math.floor((now - p.due!) / MS_PER_DAY);
     const active: ResolveSlot[] = due

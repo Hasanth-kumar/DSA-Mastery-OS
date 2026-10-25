@@ -521,10 +521,14 @@ export function TodayPage({ onOpenCoach }: Props) {
               : -1;
 
   const curriculumItems = plan?.curriculum?.items ?? [];
-  const showUpNext = !focusMode && curriculumItems.length > 0;
+  // P7.5: with the two-loop selector on, the old curriculum order (Up next,
+  // "step N of M") no longer decides anything, and on a mixed day it would
+  // name patterns, so neither is shown.
+  const twoLoop = queue != null && flags?.curriculumV2 === true && flags?.spiralPasses === true;
+  const showUpNext = !focusMode && !twoLoop && curriculumItems.length > 0;
   // Nothing left for the right column → the left column takes the full width.
   const showRightColumn = showTopicRevision || showUpNext;
-  const curriculumStep = plan?.curriculum
+  const curriculumStep = plan?.curriculum && !twoLoop
     ? `${plan.curriculum.currentIndex + 1} of ${plan.curriculum.topicNames.length}`
     : null;
 
@@ -700,7 +704,8 @@ export function TodayPage({ onOpenCoach }: Props) {
                     )
                   )}
                   {warmupOptIn ? (
-                    flow.kind === "idle" && (
+                    // P7.5: warm-up cards are the topic's own, so a mixed day offers none.
+                    flow.kind === "idle" && !mixedDay && (
                       <button
                         type="button"
                         className="today-show-more-link"
@@ -755,11 +760,21 @@ export function TodayPage({ onOpenCoach }: Props) {
                   attemptId={flow.attemptId}
                   problemName={flow.problemName}
                   usedCoach={flow.usedCoach}
-                  // P6.1: on a hidden row, guess among the patterns already introduced.
+                  // P6.1: on a hidden row, guess among the patterns already introduced
+                  // (P7.5: a logged attempt or a covered problem, so a pattern started
+                  // in its block is always on the list).
                   guessOptions={
                     flow.hiddenPattern
                       ? topics
-                          .filter((t) => t.totalAttempts > 0)
+                          .filter(
+                            (t) =>
+                              t.totalAttempts > 0 ||
+                              (problemList ?? []).some(
+                                (p) =>
+                                  p.topicId === t.id &&
+                                  (p.status === "Solved" || p.status === "Revision needed"),
+                              ),
+                          )
                           .sort((a, b) => a.name.localeCompare(b.name))
                           .map((t) => ({ id: t.id, name: t.name }))
                       : undefined

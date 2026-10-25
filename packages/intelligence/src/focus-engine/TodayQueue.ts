@@ -36,6 +36,23 @@ export const QUEUE_SESSION_MINUTES = 90;
 const REENTRY_MINUTES = 20;
 const DAY_MS = 86_400_000;
 
+/**
+ * P7.5: one progression row chosen by the two-loop selector. Each carries its
+ * own topic and whether its pattern shows (a block day shows the block's
+ * problems; the basics offer and mixed rows stay hidden).
+ */
+export interface TodayQueuePick {
+  problem: ProblemSuggestion;
+  topicId: string;
+  revealPattern: boolean;
+  /** Only when `revealPattern`. */
+  topicName?: string;
+  /** Row reason; must not name the pattern when hidden. */
+  reason: string;
+  /** Kept even past the session budget (the D13 basics offer). */
+  keep?: boolean;
+}
+
 export interface TodayQueueInput {
   /** Today's calendar date in the learner's timezone, "YYYY-MM-DD". */
   todayKey: string;
@@ -59,6 +76,10 @@ export interface TodayQueueInput {
   /** Per-row reason for progression problems, e.g. "Practicing: Medium". */
   progressionReason?: string;
   dayKind?: DayKind;
+  /** P7.5: the two-loop selector's rows, used instead of `newProblems`. */
+  picks?: TodayQueuePick[];
+  /** P7.5: a consolidation day leads with this topic's re-solve. */
+  preferResolveTopicId?: string | null;
   minutes?: number;
   weeklyTarget?: number;
 }
@@ -84,23 +105,18 @@ function resolveRow(slot: ResolvePlanSlot, minutes: number, todayKey: string): T
   };
 }
 
-function progressionRow(
-  p: ProblemSuggestion,
-  minutes: number,
-  input: TodayQueueInput,
-  reveal: boolean,
-): TodayQueueBlock {
+function pickRow(pick: TodayQueuePick, minutes: number): TodayQueueBlock {
   return {
     kind: "progression",
-    problemId: p.problemId,
-    name: p.name,
-    difficulty: p.difficulty,
-    leetcodeLink: p.leetcodeLink ?? null,
-    topicId: input.topic.id,
-    revealPattern: reveal,
-    ...(reveal ? { topicName: input.topic.name } : {}),
+    problemId: pick.problem.problemId,
+    name: pick.problem.name,
+    difficulty: pick.problem.difficulty,
+    leetcodeLink: pick.problem.leetcodeLink ?? null,
+    topicId: pick.topicId,
+    revealPattern: pick.revealPattern,
+    ...(pick.revealPattern && pick.topicName ? { topicName: pick.topicName } : {}),
     minutes,
-    reason: input.progressionReason ?? "New problem",
+    reason: pick.reason,
   };
 }
 
@@ -114,7 +130,17 @@ export function buildTodayQueue(input: TodayQueueInput): TodayQueue {
     input.weeklyTarget ?? DEFAULT_WEEKLY_TARGET,
   );
   const gapDays = computeGap(input.todayKey, input.activeDayKeys);
-  const fresh = input.newProblems.filter((p) => !p.problemId.includes("-suggested-"));
+  const picks: TodayQueuePick[] =
+    input.picks ??
+    input.newProblems
+      .filter((p) => !p.problemId.includes("-suggested-"))
+      .map((problem) => ({
+        problem,
+        topicId: input.topic.id,
+        revealPattern: reveal,
+        topicName: input.topic.name,
+        reason: input.progressionReason ?? "New problem",
+      }));
   const due = input.dueResolves;
   const reentry = gapDays != null && gapDays >= REENTRY_GAP_DAYS;
 
@@ -123,26 +149,29 @@ export function buildTodayQueue(input: TodayQueueInput): TodayQueue {
     const easiestDue = [...due].sort(
       (a, b) => difficultyRank(a.difficulty) - difficultyRank(b.difficulty) || b.daysOverdue - a.daysOverdue,
     )[0];
-    const easiestNew = [...fresh].sort(
-      (a, b) => difficultyRank(a.difficulty) - difficultyRank(b.difficulty),
+    const easiestNew = [...picks].sort(
+      (a, b) => difficultyRank(a.problem.difficulty) - difficultyRank(b.problem.difficulty),
     )[0];
     if (easiestDue) {
       blocks.push(resolveRow(easiestDue, Math.min(REENTRY_MINUTES, minutesFor(easiestDue.difficulty)), input.todayKey));
     } else if (easiestNew) {
-      blocks.push(progressionRow(easiestNew, REENTRY_MINUTES, input, reveal));
+      blocks.push(pickRow(easiestNew, REENTRY_MINUTES));
     }
   } else {
     let left = budget;
-    const resolve = due.find((s) => s.topicId !== input.topic.id) ?? due[0];
+    const resolve =
+      (input.preferResolveTopicId ? due.find((s) => s.topicId === input.preferResolveTopicId) : undefined) ??
+      due.find((s) => s.topicId !== input.topic.id) ??
+      due[0];
     if (resolve) {
       const m = minutesFor(resolve.difficulty);
       blocks.push(resolveRow(resolve, m, input.todayKey));
       left -= m;
     }
-    fresh.slice(0, 2).forEach((p, i) => {
-      const m = minutesFor(p.difficulty);
-      if (i === 0 || m <= left) {
-        blocks.push(progressionRow(p, m, input, reveal));
+    picks.slice(0, 2).forEach((p, i) => {
+      const m = minutesFor(p.problem.difficulty);
+      if (i === 0 || m <= left || p.keep) {
+        blocks.push(pickRow(p, m));
         left -= m;
       }
     });

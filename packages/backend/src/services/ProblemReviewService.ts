@@ -213,10 +213,23 @@ export class ProblemReviewService {
   }
 
   /** Capacity-fitted slots for today's plan (§6). */
-  dueSlots(now: number, options: { persistDeferrals?: boolean } = {}): ResolveDueSelection {
+  dueSlots(
+    now: number,
+    options: {
+      persistDeferrals?: boolean;
+      /** P7.5: these due problems fill the slots first (a consolidation day). */
+      preferProblemIds?: ReadonlySet<string>;
+    } = {},
+  ): ResolveDueSelection {
     const pool = this.reviewRepo.all().map(toState);
     const capacity = this.capacityFor(new Date(now));
-    const { active, deferred } = this.engine.selectDueSlots(pool, capacity, now, this.cfg);
+    const { active, deferred } = this.engine.selectDueSlots(
+      pool,
+      capacity,
+      now,
+      this.cfg,
+      options.preferProblemIds,
+    );
 
     if (options.persistDeferrals && deferred.length > 0) {
       this.reviewRepo.bulkSetDue(

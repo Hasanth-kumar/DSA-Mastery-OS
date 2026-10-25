@@ -125,4 +125,44 @@ describe("buildTodayQueue (P5.1)", () => {
     expect(q.blocks).toEqual([]);
     expect(q.decision.week).toMatchObject({ target: 5, done: 2 });
   });
+
+  it("P7.5 picks: each row keeps its own topic and visibility; the basics offer survives the budget", () => {
+    const q = buildTodayQueue(
+      base({
+        dayKind: "block",
+        minutes: 60,
+        picks: [
+          { problem: fresh("b1", "Medium"), topicId: "t-dp", revealPattern: true, topicName: "DP (1D)", reason: "New pattern · short block" },
+          { problem: fresh("k1", "Medium"), topicId: "t-basic", revealPattern: false, reason: "Basics · first pass", keep: true },
+        ],
+      }),
+    );
+    const rows = q.blocks.filter((b) => b.kind === "progression");
+    expect(rows.map((r) => [r.problemId, r.topicId, r.revealPattern, r.topicName])).toEqual([
+      ["b1", "t-dp", true, "DP (1D)"],
+      ["k1", "t-basic", false, undefined],
+    ]);
+    // 20 (Easy re-solve) + 35 + 35 > 60, but the kept offer stays.
+    expect(q.totalMinutes).toBe(90);
+  });
+
+  it("P7.5 picks: a second pick without keep still drops past the budget", () => {
+    const q = buildTodayQueue(
+      base({
+        minutes: 60,
+        picks: [
+          { problem: fresh("b1", "Medium"), topicId: "t-dp", revealPattern: false, reason: "First pass" },
+          { problem: fresh("b2", "Medium"), topicId: "t-x", revealPattern: false, reason: "First pass" },
+        ],
+      }),
+    );
+    expect(q.blocks.filter((b) => b.kind === "progression").map((b) => b.problemId)).toEqual(["b1"]);
+  });
+
+  it("P7.5: preferResolveTopicId leads with that topic's re-solve", () => {
+    const q = buildTodayQueue(base({ preferResolveTopicId: "t-primary" }));
+    expect(q.blocks[0]).toMatchObject({ kind: "resolve", problemId: "r1" });
+    expect(buildTodayQueue(base()).blocks[0]).toMatchObject({ kind: "resolve", problemId: "r2" });
+  });
 });
+

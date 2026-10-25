@@ -136,7 +136,13 @@ export function createAppContext(
     problemReviewService,
     sessionRepo,
     config.schedulers.timezone,
-    { hideTopicRevision: config.flags.hideTopicRevision, todayQueueV2: config.flags.todayQueueV2 },
+    {
+      hideTopicRevision: config.flags.hideTopicRevision,
+      todayQueueV2: config.flags.todayQueueV2,
+      curriculumV2: config.flags.curriculumV2,
+      spiralPasses: config.flags.spiralPasses,
+    },
+    { attemptRepo, problemReviewRepo },
   );
   const coachUsage = new Map<string, number>();
   const sessionService = new SessionService(

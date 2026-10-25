@@ -170,11 +170,11 @@ describe("two-loop selector — a block runs to completion, then mixed days", ()
     expect(days[2].why).toBe("Dynamic Programming (1D): short block, 2 of 4 done.");
     // The basics offer rotated tp, sw, hash, tp: least recently practised first.
     expect(days.slice(0, 4).map((d) => d.picks[1].problemId)).toEqual(["tp-e1", "sw-e1", "hash-e1", "tp-e2"]);
-    // Day 5: block done, DP below pass 1 (needs m3). A mixed day: basic first, then DP's last pass-1 problem.
+    // Day 5: block done, DP below pass 1 (needs m3). A mixed day: DP's last pass-1 problem, then the basics offer.
     expect(days[4]).toMatchObject({ dayKind: "mixed", phase: "mixed" });
     expect(days[4].picks.map((p) => [p.problemId, p.role])).toEqual([
-      ["sw-e2", "basic"],
       ["dp-m3", "pool"],
+      ["sw-e2", "basic"],
     ]);
     expectNoPatternNamed(days[4]);
     expect(days[4].why).toMatch(/^Mixed practice: \d+ patterns still need a first pass\.$/);

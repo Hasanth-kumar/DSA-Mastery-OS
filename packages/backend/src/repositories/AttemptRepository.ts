@@ -1,4 +1,4 @@
-import { desc, eq, gte } from "drizzle-orm";
+import { asc, desc, eq, gte } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { problemAttempts } from "@dsa/database/schema";
 import type { SqliteDb } from "@dsa/integrations";
@@ -114,6 +114,11 @@ export class AttemptRepository {
       .orderBy(desc(problemAttempts.solvedAt))
       .limit(limit)
       .all();
+  }
+
+  /** Every attempt, oldest first (P7.5: pass tracking reads the whole history). */
+  findAll(): AttemptRow[] {
+    return this.db.select().from(problemAttempts).orderBy(asc(problemAttempts.solvedAt)).all();
   }
 
   findRecent(limit = 50): AttemptRow[] {

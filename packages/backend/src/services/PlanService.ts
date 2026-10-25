@@ -4,9 +4,18 @@ import type {
   ResolvePlanSlot,
   RevisionProblem,
   StudyPlan,
+  TodayQueuePick,
   TopicState,
+  TwoLoopDay,
 } from "@dsa/intelligence";
-import { buildFocusPlan, buildTodayQueue, computePriorityScore } from "@dsa/intelligence";
+import {
+  buildFocusPlan,
+  buildTodayQueue,
+  computePriorityScore,
+  selectTwoLoopDay,
+} from "@dsa/intelligence";
+import type { AttemptRepository } from "../repositories/AttemptRepository.js";
+import type { ProblemReviewRepository } from "../repositories/ProblemReviewRepository.js";
 import type { ProblemRepository } from "../repositories/ProblemRepository.js";
 import type { SessionRepository } from "../repositories/SessionRepository.js";
 import type { TopicRepository } from "../repositories/TopicRepository.js";
@@ -16,6 +25,7 @@ import type { CacheService } from "./CacheService.js";
 import type { CurriculumService } from "./CurriculumService.js";
 import { asDifficulty, ProblemSuggestionService } from "./ProblemSuggestionService.js";
 import { resolveSlotMinutes, type ProblemReviewService } from "./ProblemReviewService.js";
+import { buildTwoLoopInput, PICK_REASONS } from "./two-loop-input.js";
 
 export class PlanService {
   private readonly problemSuggestions: ProblemSuggestionService;
@@ -30,8 +40,18 @@ export class PlanService {
     /** Session history for the focus plan's weekly target and gap detection. */
     private readonly sessionRepo?: SessionRepository,
     private readonly configuredTimeZone?: string,
-    /** Overhaul flags this service reads (P4.3). */
-    private readonly flags: { hideTopicRevision?: boolean; todayQueueV2?: boolean } = {},
+    /** Overhaul flags this service reads (P4.3, P7.5). */
+    private readonly flags: {
+      hideTopicRevision?: boolean;
+      todayQueueV2?: boolean;
+      curriculumV2?: boolean;
+      spiralPasses?: boolean;
+    } = {},
+    /** P7.5: history the two-loop selector reads. */
+    private readonly twoLoopRepos: {
+      attemptRepo?: AttemptRepository;
+      problemReviewRepo?: ProblemReviewRepository;
+    } = {},
   ) {
     this.problemSuggestions = new ProblemSuggestionService(problemRepo);
   }
@@ -72,7 +92,14 @@ export class PlanService {
       throw new Error("No topics available for planning");
     }
 
-    const primaryTopic = selection.topic;
+    // P7.5: the two-loop selector reads re-solves as stored, before today's
+    // overflow is pushed forward, so a consolidation day can see the backlog.
+    // On its block days the block's pattern is the plan's primary topic, so
+    // the hero, warm-up, coach and nav agree with the queue.
+    const twoLoop = this.selectTwoLoop(topics);
+    const primaryTopic =
+      (twoLoop?.blockTopicId ? topics.find((t) => t.id === twoLoop.blockTopicId) : undefined) ??
+      selection.topic;
     const difficultyRec = this.intelligence.getDifficultyRecommendation(primaryTopic);
     const suggestedProblems = this.problemSuggestions.selectForTopic(
       primaryTopic,
@@ -104,12 +131,22 @@ export class PlanService {
 
     // Re-solve slots (re-solve design §6): additive to the primary topic's new
     // problems, capacity-fitted, overflow deferred forward like compressQueue.
+    const preferProblemIds = twoLoop?.resolveTopicId
+      ? new Set(
+          this.problemRepo
+            .findAll()
+            .filter((p) => p.topicId === twoLoop.resolveTopicId)
+            .map((p) => p.id),
+        )
+      : undefined;
+
     let resolveSlots: ResolvePlanSlot[] = [];
     let resolveTotalDue = 0;
     let resolveDeferred = 0;
     if (this.problemReviews) {
       const selection = this.problemReviews.dueSlots(Date.now(), {
         persistDeferrals: internal.rescheduleDeferred,
+        preferProblemIds,
       });
       resolveSlots = selection.slots;
       resolveTotalDue = selection.totalDue;
@@ -141,7 +178,7 @@ export class PlanService {
       .slice(0, 5)
       .map((s) => ({ id: s.topic.id, name: s.topic.name }));
 
-    let reasoning = selection.reasoning;
+    let reasoning = twoLoop ? twoLoop.why : selection.reasoning;
     if (primaryScore.memoryExecutionDivergence) {
       // P4.1 (F5): under FSRS urgency there is no review date to point at.
       reasoning += primaryTopic.resolveDueAt
@@ -156,10 +193,12 @@ export class PlanService {
     const focus = this.buildFocus(topics, primaryTopic, suggestedProblems, resolveSlots, options, days);
     const curriculum = this.curriculumService.toProgress(selection);
 
-    // P5.1: Today's single ordered list (todayQueueV2). Every day is a block
-    // day for the primary topic until P7.4.
+    // P5.1: Today's single ordered list (todayQueueV2). Without the two-loop
+    // selector every day is a block day for the primary topic (P3.4).
     let todayQueue: StudyPlan["queue"];
-    if (this.flags.todayQueueV2) {
+    if (twoLoop) {
+      todayQueue = this.buildTwoLoopQueue(twoLoop, topics, resolveSlots, days, options);
+    } else if (this.flags.todayQueueV2) {
       const item = curriculum?.items.find((i) => i.topicId === primaryTopic.id);
       todayQueue = buildTodayQueue({
         todayKey: days.todayKey,
@@ -199,6 +238,89 @@ export class PlanService {
       focus,
       ...(todayQueue ? { queue: todayQueue } : {}),
     };
+  }
+
+  /**
+   * P7.5: the two-loop selector (P7.4) when `curriculumV2` and `spiralPasses`
+   * are on. Its picks reach the learner through the Today queue, so it also
+   * needs `todayQueueV2`; otherwise null and the P3.4 path stands.
+   */
+  private selectTwoLoop(topics: TopicState[]): TwoLoopDay | null {
+    const { attemptRepo, problemReviewRepo } = this.twoLoopRepos;
+    if (
+      !this.flags.todayQueueV2 ||
+      !this.flags.curriculumV2 ||
+      !this.flags.spiralPasses ||
+      !attemptRepo ||
+      !problemReviewRepo
+    ) {
+      return null;
+    }
+    return selectTwoLoopDay(
+      buildTwoLoopInput({
+        topics,
+        problems: this.problemRepo.findAll(),
+        attempts: attemptRepo.findAll(),
+        reviews: problemReviewRepo.all(),
+        pinnedTopicId: this.curriculumService.getConfig().activeTopicId ?? null,
+        now: Date.now(),
+        timeZone: learnerTimeZone(this.configuredTimeZone),
+      }),
+    );
+  }
+
+  private buildTwoLoopQueue(
+    day: TwoLoopDay,
+    topics: TopicState[],
+    resolveSlots: ResolvePlanSlot[],
+    days: { todayKey: string; activeDayKeys: string[] },
+    options: PlanOptions,
+  ): StudyPlan["queue"] {
+    const problems = new Map(this.problemRepo.findAll().map((p) => [p.id, p]));
+    const topicsById = new Map(topics.map((t) => [t.id, t]));
+    const picks: TodayQueuePick[] = day.picks.flatMap((pick) => {
+      const row = problems.get(pick.problemId);
+      if (!row) return [];
+      return [
+        {
+          problem: {
+            problemId: row.id,
+            name: row.name,
+            difficulty: asDifficulty(row.difficulty) ?? "Medium",
+            leetcodeLink: row.leetcodeLink ?? undefined,
+          },
+          topicId: pick.topicId,
+          revealPattern: pick.revealPattern,
+          ...(pick.revealPattern ? { topicName: topicsById.get(pick.topicId)?.name } : {}),
+          reason: PICK_REASONS[pick.role],
+          keep: pick.role === "basic",
+        },
+      ];
+    });
+    const blockTopic = day.blockTopicId ? topicsById.get(day.blockTopicId) : undefined;
+    const blockPass = day.passes.find((p) => p.topicId === day.blockTopicId);
+    return buildTodayQueue({
+      todayKey: days.todayKey,
+      activeDayKeys: days.activeDayKeys,
+      dueResolves: resolveSlots,
+      newProblems: [],
+      picks,
+      preferResolveTopicId: day.resolveTopicId,
+      dayKind: day.dayKind,
+      topic: blockTopic
+        ? {
+            id: blockTopic.id,
+            name: blockTopic.name,
+            stage: this.intelligence.getDifficultyRecommendation(blockTopic).stage ?? null,
+            covered: blockPass?.pass1.covered ?? 0,
+            total: blockPass?.pass1.total ?? 0,
+          }
+        : { id: "", name: "", stage: null, covered: 0, total: 0 },
+      why: day.why,
+      mixedWhy: day.why,
+      minutes: options.availableMinutes,
+      weeklyTarget: options.weeklyTarget,
+    });
   }
 
   /** Today's date and the days with a logged session, in the learner's timezone. */
