@@ -68,6 +68,15 @@ export { buildFocusPlan, type FocusInput } from "./focus-engine/FocusPlanner.js"
 export { buildTodayQueue, type TodayQueueInput } from "./focus-engine/TodayQueue.js";
 export { buildTopicGraphEdges } from "./roadmap-engine/graph-edges.js";
 export {
+  BASIC_TOPICS,
+  buildHardPrerequisiteEdges,
+  CORE_TOPIC_ORDER,
+  findTopicByName,
+  HARD_TOPIC_PREREQUISITES,
+  hardPrerequisitesOf,
+  LATER_TOPIC_ORDER,
+} from "./roadmap-engine/topic-prerequisites.js";
+export {
   createIntelligenceOrchestrator,
   IntelligenceOrchestrator,
 } from "./orchestrator/IntelligenceOrchestrator.js";

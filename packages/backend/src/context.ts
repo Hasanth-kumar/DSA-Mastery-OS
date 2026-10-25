@@ -114,7 +114,9 @@ export function createAppContext(
   const obsidianNotes = new ObsidianNoteService(config, noteRepo, problemRepo, topicRepo, () =>
     events.publish("note"),
   );
-  const curriculumService = new CurriculumService(syncMetaRepo, problemRepo);
+  const curriculumService = new CurriculumService(syncMetaRepo, problemRepo, {
+    curriculumV2: config.flags.curriculumV2,
+  });
   const problemReviewRepo = new ProblemReviewRepository(db);
   const problemReviewService = new ProblemReviewService(
     config,

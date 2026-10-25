@@ -15,6 +15,14 @@ export function GraphPage() {
   const [orphans, setOrphans] = useState<Topic[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // P7.2: with curriculumV2 the graph shows the approved hard prerequisites only.
+  const [hardOnly, setHardOnly] = useState(false);
+  useEffect(() => {
+    api
+      .getFlags()
+      .then((f) => setHardOnly(f.curriculumV2))
+      .catch(() => setHardOnly(false));
+  }, []);
   const [evidence, setEvidence] = useState<WeaknessEvidence | null>(null);
   const [studyMessage, setStudyMessage] = useState<string | null>(null);
   const [settingFocus, setSettingFocus] = useState(false);
@@ -96,6 +104,7 @@ export function GraphPage() {
             topics={topics}
             selectedId={selectedId}
             onNodeClick={selectTopic}
+            hardPrerequisitesOnly={hardOnly}
           />
         </Suspense>
 

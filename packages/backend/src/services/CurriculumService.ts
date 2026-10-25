@@ -1,6 +1,7 @@
 import {
   buildTopicProblemCounts,
   createCurriculumEngine,
+  buildHardPrerequisiteEdges,
   buildTopicGraphEdges,
   evaluatePinExpiry,
   PIN_MAX_AGE_DAYS,
@@ -41,6 +42,8 @@ export class CurriculumService {
   constructor(
     private readonly syncMetaRepo: SyncMetaRepository,
     private readonly problemRepo: ProblemRepository,
+    /** P7.2: with `curriculumV2`, ranking uses only the approved hard prerequisites. */
+    private readonly flags: { curriculumV2?: boolean } = {},
   ) {}
 
   getTopicNames(): string[] {
@@ -154,7 +157,9 @@ export class CurriculumService {
       this.buildProblemCounts(),
       {
         currentTopicId: this.syncMetaRepo.get(CURRENT_TOPIC_KEY) || null,
-        edges: buildTopicGraphEdges(topics),
+        edges: this.flags.curriculumV2
+          ? buildHardPrerequisiteEdges(topics)
+          : buildTopicGraphEdges(topics),
       },
     );
     if (
