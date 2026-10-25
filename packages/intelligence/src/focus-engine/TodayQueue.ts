@@ -80,6 +80,7 @@ function resolveRow(slot: ResolvePlanSlot, minutes: number, todayKey: string): T
     minutes,
     reason: slot.reason,
     dueSince: keyMinusDays(todayKey, Math.max(0, slot.daysOverdue)),
+    ...(slot.takeaway ? { takeaway: slot.takeaway } : {}),
   };
 }
 

@@ -1,4 +1,4 @@
-import type { TopicState, WeaknessSignal } from "../types.js";
+import type { MistakeTag, TopicState, WeaknessSignal } from "../types.js";
 import { latestSessions } from "../utils/sessions.js";
 
 const SIGNAL_WEIGHTS = {
@@ -108,11 +108,13 @@ export function revisionFailureSignal(topic: TopicState): WeaknessSignal {
 }
 
 /** Human-readable practice advice per repeated mistake tag. */
-export const MISTAKE_TAG_ADVICE: Record<string, string> = {
+export const MISTAKE_TAG_ADVICE: Record<MistakeTag, string> = {
   "off-by-one": "practice boundary conditions and loop invariants",
   "edge-case": "enumerate edge cases (empty, single element, duplicates) before coding",
   "wrong-approach": "slow down on approach selection; name the pattern before coding",
   "pattern-recall": "drill pattern recognition with flashcard-style review",
+  "greedy-invariant": "before coding a greedy, state why the local choice is safe and look for a counterexample",
+  "loop-bounds": "write the loop's start, stop and termination condition before the body",
 };
 
 export function mistakeTagSignal(topic: TopicState): WeaknessSignal {

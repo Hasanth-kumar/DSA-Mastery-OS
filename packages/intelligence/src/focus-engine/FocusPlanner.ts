@@ -3,6 +3,7 @@ import type {
   FocusMode,
   FocusPlan,
   FocusWeek,
+  MistakeTag,
   ProblemSuggestion,
   ResolvePlanSlot,
   TopicDifficulty,
@@ -44,7 +45,7 @@ export interface FocusInput {
   weeklyTarget?: number;
 }
 
-const CHECKLISTS: Record<string, string[]> = {
+const CHECKLISTS: Record<MistakeTag, string[]> = {
   "off-by-one": [
     "Does the loop touch the first AND last index?",
     "Check < versus <= at every boundary",
@@ -64,6 +65,16 @@ const CHECKLISTS: Record<string, string[]> = {
     "What does the input shape hint at: sorted, window, graph, intervals?",
     "Which similar problem have you solved before?",
     "Write the pattern name next to the problem before you code",
+  ],
+  "greedy-invariant": [
+    "Say why the local choice can never hurt the final answer",
+    "Try to break it with a small counterexample first",
+    "Would sorting by a different key change the answer?",
+  ],
+  "loop-bounds": [
+    "Write the loop's start, stop and termination condition first",
+    "Does the loop always make progress (no infinite loop)?",
+    "Check the state right after the loop ends",
   ],
 };
 
@@ -162,11 +173,11 @@ export function buildFocusPlan(input: FocusInput): FocusPlan {
   const doneToday = input.activeDayKeys.includes(input.todayKey);
 
   const tip =
-    input.topMistake && CHECKLISTS[input.topMistake.tag]
+    input.topMistake && input.topMistake.tag in CHECKLISTS
       ? {
           tag: input.topMistake.tag,
           count: input.topMistake.count,
-          checklist: CHECKLISTS[input.topMistake.tag],
+          checklist: CHECKLISTS[input.topMistake.tag as MistakeTag],
         }
       : null;
 

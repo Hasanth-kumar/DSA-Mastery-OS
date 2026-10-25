@@ -91,10 +91,10 @@ export class WeaknessEngine {
   private mistakeTagRecommendation(topic: TopicState): string | null {
     const counts = topic.mistakeTagCounts ?? {};
     const dominant = Object.entries(counts)
-      .filter(([tag, n]) => n >= 2 && MISTAKE_TAG_ADVICE[tag])
+      .filter(([tag, n]) => n >= 2 && adviceFor(tag))
       .sort((a, b) => b[1] - a[1])[0];
     if (!dominant) return null;
-    return `Repeated "${dominant[0]}" mistakes — ${MISTAKE_TAG_ADVICE[dominant[0]]} in ${topic.name}.`;
+    return `Repeated "${dominant[0]}" mistakes — ${adviceFor(dominant[0])} in ${topic.name}.`;
   }
 
   private summarize(
@@ -106,4 +106,9 @@ export class WeaknessEngine {
     }
     return `${weakCount} of ${analyses.length} topics flagged as weak areas needing focused practice.`;
   }
+}
+
+/** Advice for a stored tag; stored rows may hold tags outside the closed set. */
+function adviceFor(tag: string): string | undefined {
+  return (MISTAKE_TAG_ADVICE as Record<string, string | undefined>)[tag];
 }

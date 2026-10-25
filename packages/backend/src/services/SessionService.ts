@@ -17,7 +17,7 @@ import {
   type AttemptRepository,
   type AttemptRow,
 } from "../repositories/AttemptRepository.js";
-import type { ProblemReviewService } from "./ProblemReviewService.js";
+import { asHelpLevel, type ProblemReviewService } from "./ProblemReviewService.js";
 import type { ProblemRepository, ProblemRow } from "../repositories/ProblemRepository.js";
 import type {
   CreateSessionInput,
@@ -376,6 +376,7 @@ export class SessionService {
       difficulty: asDifficulty(problem?.difficulty),
       usedHelp: Boolean(attempt.usedCoach),
       hintCount: attempt.hintCount ?? 0,
+      helpLevel: asHelpLevel(attempt.helpLevel),
       mistakeTags: parseMistakeTags(attempt.mistakeTag),
     });
 
@@ -457,7 +458,10 @@ export class SessionService {
   ): Promise<void> {
     const problem = this.problemRepo.findById(problemId);
     if (!problem) return;
-    this.applyProblemStatus(problemId, tags, problem);
+    // P6.1: approach help or a full solution also means "not clean yet".
+    const level = this.config.flags.helpLevelCapture ? asHelpLevel(attempt?.helpLevel) : null;
+    const needsRevision = level === "approach" || level === "solution";
+    this.applyProblemStatus(problemId, tags, problem, needsRevision);
     // P4.2: tags and the help tick are known now — redo the re-solve's rating.
     if (attempt?.kind === "resolve" && this.config.flags.unifiedCompletion) {
       this.problemReviews?.completeAttempt(attempt);
@@ -497,8 +501,9 @@ export class SessionService {
     problemId: string,
     tags: string[],
     current: ProblemRow,
+    needsRevision = false,
   ): ProblemRow {
-    const status = tags.length > 0 ? "Revision needed" : "Solved";
+    const status = tags.length > 0 || needsRevision ? "Revision needed" : "Solved";
     const updated = this.problemRepo.update(problemId, { status });
     const row = updated ?? { ...current, status, updatedAt: Date.now() };
     this.notionSync.markProblemDirty(problemId, row);
@@ -551,6 +556,7 @@ export class SessionService {
           difficulty: asDifficulty(this.problemRepo.findById(linkedAttempt.problemId)?.difficulty),
           usedHelp: Boolean(linkedAttempt.usedCoach),
           hintCount: linkedAttempt.hintCount ?? 0,
+          helpLevel: asHelpLevel(linkedAttempt.helpLevel),
           mistakeTags: parseMistakeTags(linkedAttempt.mistakeTag),
         });
       } else if (patch.studyDuration != null) {

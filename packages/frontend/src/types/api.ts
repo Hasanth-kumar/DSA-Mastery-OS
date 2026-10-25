@@ -34,6 +34,8 @@ export type {
   RevisionProblem,
   StreakInfo,
   TodayQueue,
+  HelpLevel,
+  HelpSource,
   TopicDifficulty,
   TopicDifficultyAlignment,
   TopicStatus,

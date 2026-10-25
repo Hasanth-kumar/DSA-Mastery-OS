@@ -1,4 +1,4 @@
-import type { TopicDifficulty } from "../types.js";
+import { APPROACH_MISTAKE_TAGS, type HelpLevel, type TopicDifficulty } from "../types.js";
 
 /**
  * Problem re-solve engine (problem-spaced-repetition design §8) — the sixth
@@ -89,10 +89,15 @@ export interface CompletionOutcome {
   mistakeTags: readonly string[];
   /** Needed help: the "used coach / outside help" tick or in-app hints. */
   usedHelp: boolean;
+  /**
+   * P6.1: captured help level. When present it replaces `usedHelp`; a legacy
+   * `usedHelp` counts as "approach" (the old rule rated any help Hard).
+   */
+  helpLevel?: HelpLevel | null;
 }
 
-/** Tags that mean the approach itself was missing, not a slip in the details. */
-const APPROACH_TAGS = new Set(["wrong-approach", "pattern-recall"]);
+/** Tags that mean the approach itself was missing, not a slip in the details (P6.3). */
+const APPROACH_TAGS = new Set<string>(APPROACH_MISTAKE_TAGS);
 
 /** Scheduling snapshot of one pooled problem (subset of `problem_reviews`). */
 export interface ProblemReviewState {
@@ -189,11 +194,13 @@ export class ProblemReviewEngine {
    *
    * | Signals | Rating |
    * |---|---|
-   * | `could-not-solve`, or help **and** a missing approach | again |
-   * | help, a missing approach, or slower than the target | hard |
-   * | only detail slips (edge case, off-by-one), or untimed | good |
+   * | `could-not-solve`, full solution, or approach help **and** a missing approach | again |
+   * | approach help, a missing approach, or slower than the target | hard |
+   * | a hint, only detail slips (edge case, off-by-one, loop bounds), or untimed | good |
    * | clean, at most the target | good |
    * | clean, at most half the target | easy |
+   *
+   * A hint still counts as clean (P6.1), so it caps the rating at good.
    */
   inferCompletionRating(
     outcome: CompletionOutcome,
@@ -201,12 +208,14 @@ export class ProblemReviewEngine {
   ): ResolveRating {
     const tags = outcome.mistakeTags;
     const missingApproach = tags.some((t) => APPROACH_TAGS.has(t));
-    if (tags.includes("could-not-solve")) return "again";
-    if (outcome.usedHelp && missingApproach) return "again";
+    const level: HelpLevel = outcome.helpLevel ?? (outcome.usedHelp ? "approach" : "none");
+    const substantialHelp = level === "approach" || level === "solution";
+    if (tags.includes("could-not-solve") || level === "solution") return "again";
+    if (substantialHelp && missingApproach) return "again";
     const target = config.slowThresholdMin[outcome.difficulty ?? "Medium"];
     const slow = outcome.timeTakenMin != null && outcome.timeTakenMin > target;
-    if (outcome.usedHelp || missingApproach || slow) return "hard";
-    if (tags.length > 0 || outcome.timeTakenMin == null) return "good";
+    if (substantialHelp || missingApproach || slow) return "hard";
+    if (level === "hint" || tags.length > 0 || outcome.timeTakenMin == null) return "good";
     return outcome.timeTakenMin <= target / 2 ? "easy" : "good";
   }
 

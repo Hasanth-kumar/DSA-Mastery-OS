@@ -67,6 +67,14 @@ export const problemAttempts = sqliteTable("problem_attempts", {
   hintCount: integer("hint_count").default(0),
   /** 'solve' | 'resolve' — a re-solve is recorded as a normal attempt row. */
   kind: text("kind").notNull().default("solve"),
+  /** P6.1: 'none' | 'hint' | 'approach' | 'solution'. NULL on rows from before 0017. */
+  helpLevel: text("help_level"),
+  /** P6.1: 'coach' | 'external-ai' | 'other'. */
+  helpSource: text("help_source"),
+  /** P6.1: topic id named on a hidden-pattern row, or 'unsure'. */
+  patternGuess: text("pattern_guess"),
+  /** P6.2: one-line takeaway. */
+  takeaway: text("takeaway"),
   createdAt: integer("created_at").notNull(),
 });
 

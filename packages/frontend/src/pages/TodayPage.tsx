@@ -4,6 +4,7 @@ import { CheckCircleIcon, EmptyState } from "../components/EmptyState.js";
 import { FocusCard } from "../components/FocusCard.js";
 import { MasteryRing } from "../components/MasteryRing.js";
 import { MistakeCapture } from "../components/MistakeCapture.js";
+import { MistakeCaptureV2 } from "../components/MistakeCaptureV2.js";
 import { PageHeader } from "../components/PageHeader.js";
 import { ProblemNotePanel } from "../components/ProblemNotePanel.js";
 import { ResolveTodaySection, type UnifiedResolveFlow } from "../components/ResolveTodaySection.js";
@@ -51,6 +52,8 @@ interface TodayRow {
   revealPattern: boolean;
   reason?: string;
   dueSince?: string;
+  /** P6.2: the last takeaway, shown on a re-solve as a reminder. */
+  takeaway?: string;
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -91,6 +94,8 @@ type Flow =
       problemId: string;
       problemName: string;
       usedCoach?: boolean;
+      /** P6.1: the row's pattern was hidden, so capture asks for a guess first. */
+      hiddenPattern?: boolean;
     }
   | { kind: "note-offer"; problemId: string; problemName: string }
   | { kind: "revision-offer"; problem: RevisionProblem }
@@ -313,6 +318,7 @@ export function TodayPage({ onOpenCoach }: Props) {
           problemId,
           problemName,
           usedCoach: result.usedCoach,
+          hiddenPattern: rows.find((r) => r.problemId === problemId)?.revealPattern === false,
         });
       } else {
         setMessage({ text: `Logged ${problemName} (${minutes} min).`, ok: true });
@@ -744,18 +750,43 @@ export function TodayPage({ onOpenCoach }: Props) {
 
           {flow.kind === "mistake" && (
             <div className="panel-v2 flow-reveal" style={{ marginBottom: "1.4rem" }}>
-              <MistakeCapture
-                attemptId={flow.attemptId}
-                problemName={flow.problemName}
-                usedCoach={flow.usedCoach}
-                onDone={() =>
-                  setFlow({
-                    kind: "note-offer",
-                    problemId: flow.problemId,
-                    problemName: flow.problemName,
-                  })
-                }
-              />
+              {flags?.helpLevelCapture ? (
+                <MistakeCaptureV2
+                  attemptId={flow.attemptId}
+                  problemName={flow.problemName}
+                  usedCoach={flow.usedCoach}
+                  // P6.1: on a hidden row, guess among the patterns already introduced.
+                  guessOptions={
+                    flow.hiddenPattern
+                      ? topics
+                          .filter((t) => t.totalAttempts > 0)
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map((t) => ({ id: t.id, name: t.name }))
+                      : undefined
+                  }
+                  takeawayField={flags.takeawayField}
+                  onDone={() =>
+                    setFlow({
+                      kind: "note-offer",
+                      problemId: flow.problemId,
+                      problemName: flow.problemName,
+                    })
+                  }
+                />
+              ) : (
+                <MistakeCapture
+                  attemptId={flow.attemptId}
+                  problemName={flow.problemName}
+                  usedCoach={flow.usedCoach}
+                  onDone={() =>
+                    setFlow({
+                      kind: "note-offer",
+                      problemId: flow.problemId,
+                      problemName: flow.problemName,
+                    })
+                  }
+                />
+              )}
             </div>
           )}
 
@@ -1044,6 +1075,11 @@ export function TodayPage({ onOpenCoach }: Props) {
                     </div>
                     {p.kind === "resolve" && p.reason && (
                       <p className="problem-row-reason">{p.reason}</p>
+                    )}
+                    {p.kind === "resolve" && p.takeaway && (
+                      <p className="problem-row-reason problem-row-takeaway">
+                        Last time: &ldquo;{p.takeaway}&rdquo;
+                      </p>
                     )}
                     <div className="problem-row-actions">
                       {!started && (

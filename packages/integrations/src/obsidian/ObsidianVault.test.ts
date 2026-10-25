@@ -64,3 +64,29 @@ describe("ObsidianVault.createNoteFile", () => {
     expect(path).toBe("Topics/Sliding Window/Minimum Size Subarray Sum.md");
   });
 });
+
+describe("ObsidianVault.appendToNote (P6.2)", () => {
+  const roots: string[] = [];
+  afterEach(() => {
+    for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  });
+
+  it("appends to an existing note and leaves its content intact", async () => {
+    const { readFileSync, writeFileSync } = await import("node:fs");
+    const root = mkdtempSync(join(tmpdir(), "dsa-vault-"));
+    roots.push(root);
+    writeFileSync(join(root, "Two Sum.md"), "# Two Sum\n\nmy notes\n");
+    const vault = new ObsidianVault(root);
+    expect(vault.appendToNote("Two Sum.md", "- line\n")).toBe(true);
+    expect(readFileSync(join(root, "Two Sum.md"), "utf-8")).toBe("# Two Sum\n\nmy notes\n- line\n");
+  });
+
+  it("refuses missing files, non-markdown files and paths outside the vault", () => {
+    const root = mkdtempSync(join(tmpdir(), "dsa-vault-"));
+    roots.push(root);
+    const vault = new ObsidianVault(root);
+    expect(vault.appendToNote("Missing.md", "x")).toBe(false);
+    expect(vault.appendToNote("../outside.md", "x")).toBe(false);
+    expect(vault.appendToNote("notes.txt", "x")).toBe(false);
+  });
+});

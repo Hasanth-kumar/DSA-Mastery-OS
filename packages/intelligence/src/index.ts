@@ -22,13 +22,22 @@ export type {
   FocusMode,
   FocusPlan,
   FocusWeek,
+  HelpLevel,
+  HelpSource,
   DayKind,
   TodayDecision,
   TodayQueue,
   TodayQueueBlock,
 } from "./types.js";
 
-export { MISTAKE_TAG_LABELS } from "./types.js";
+export {
+  APPROACH_MISTAKE_TAGS,
+  HELP_LEVEL_LABELS,
+  HELP_LEVELS,
+  HELP_SOURCE_LABELS,
+  MISTAKE_TAG_LABELS,
+  MISTAKE_TAGS,
+} from "./types.js";
 
 export { computePriorityScore } from "./topic-priority-engine/scoring.js";
 export {

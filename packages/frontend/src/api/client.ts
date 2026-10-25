@@ -4,6 +4,8 @@ import type {
   CoachModelList,
   CurriculumState,
   FeatureFlags,
+  HelpLevel,
+  HelpSource,
   HealthInfo,
   LeetCodeUserStats,
   LeetCodeActivity,
@@ -247,7 +249,18 @@ export const api = {
       "streak",
     ),
 
-  setMistake: (attemptId: string, input: { tags: string[]; usedCoach?: boolean }) =>
+  setMistake: (
+    attemptId: string,
+    input: {
+      tags: string[];
+      usedCoach?: boolean;
+      /** P6.1 */
+      helpLevel?: HelpLevel;
+      helpSource?: HelpSource;
+      /** P6.2 */
+      takeaway?: string;
+    },
+  ) =>
     invalidating(
       request<{ attempt: { id: string; mistakeTag: string | null } }>(
         `/api/attempts/${attemptId}/mistake`,
@@ -256,6 +269,13 @@ export const api = {
       "topics",
       "dashboard",
       "activity:",
+    ),
+
+  /** P6.1: store the pattern guess on a hidden-pattern row and reveal the real one. */
+  guessPattern: (attemptId: string, guess: string) =>
+    request<{ topicId: string | null; topicName: string | null; correct: boolean }>(
+      `/api/attempts/${attemptId}/pattern-guess`,
+      { method: "POST", body: JSON.stringify({ guess }) },
     ),
 
   /** Returns null when no note matched this problem (404). */

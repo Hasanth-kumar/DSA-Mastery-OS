@@ -287,7 +287,8 @@ Target model, with one job each:
 - Flag `takeawayField`.
 
 **P6.3 Sharper mistake tags** · XS
-- Add `greedy-invariant` and `loop-bounds` to the closed vocabulary in `concepts.yaml`, and make sure `FocusPlanner` CHECKLISTS tags and the teaching-strategy tags match (Gemini flagged a mismatch). Single source of truth for tags.
+- Add `greedy-invariant` and `loop-bounds` to the closed vocabulary, and make sure `FocusPlanner` CHECKLISTS tags and the teaching-strategy tags match (Gemini flagged a mismatch). Single source of truth for tags.
+- Corrected 2026-10-25 while building it: `concepts.yaml` is the per-pattern flashcard concept vocabulary, not the mistake tags. The mistake vocabulary is `MistakeTag` in `packages/intelligence/src/types.ts`; that is now the single source.
 
 **P6.4 Pre-solve pattern gate** · **dropped** (D6, Santosh 2026-10-25: over-engineering). Do not build.
 

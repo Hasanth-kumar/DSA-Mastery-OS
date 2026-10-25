@@ -48,18 +48,67 @@ export interface TopicState {
 }
 
 /** One-tap mistake taxonomy captured after logging a problem. */
+/**
+ * The closed mistake vocabulary — the single source of truth (P6.3). Every
+ * per-tag table (labels, weakness advice, FocusPlanner checklists) is typed
+ * `Record<MistakeTag, …>`, so adding a tag here fails the build until each
+ * table covers it. `could-not-solve` is a system tag for failed re-solves,
+ * not a capture option.
+ */
 export type MistakeTag =
   | "wrong-approach"
   | "edge-case"
   | "off-by-one"
-  | "pattern-recall";
+  | "pattern-recall"
+  | "greedy-invariant"
+  | "loop-bounds";
 
 export const MISTAKE_TAG_LABELS: Record<MistakeTag, string> = {
   "wrong-approach": "Wrong approach",
-  "edge-case": "Edge case",
+  "edge-case": "Missed edge case",
   "off-by-one": "Off-by-one",
   "pattern-recall": "Couldn't recall pattern",
+  "greedy-invariant": "Wrong greedy choice",
+  "loop-bounds": "Loop bounds / termination",
 };
+
+/**
+ * P6.1: how much help a solve needed, replacing the "used coach" checkbox.
+ * "Clean" in the overhaul plan = no `wrong-approach` and help ≤ `hint`.
+ */
+export type HelpLevel = "none" | "hint" | "approach" | "solution";
+/** P6.1: where the help came from. */
+export type HelpSource = "coach" | "external-ai" | "other";
+
+export const HELP_LEVELS: readonly HelpLevel[] = ["none", "hint", "approach", "solution"];
+export const HELP_LEVEL_LABELS: Record<HelpLevel, string> = {
+  none: "None",
+  hint: "Hint",
+  approach: "Approach",
+  solution: "Full solution",
+};
+export const HELP_SOURCE_LABELS: Record<HelpSource, string> = {
+  coach: "In-app coach",
+  "external-ai": "External AI",
+  other: "Other",
+};
+
+/** Capture order on MistakeCapture. The last two were added in P6.3. */
+export const MISTAKE_TAGS: readonly MistakeTag[] = [
+  "wrong-approach",
+  "edge-case",
+  "off-by-one",
+  "pattern-recall",
+  "greedy-invariant",
+  "loop-bounds",
+];
+
+/** Tags meaning the core idea was missing, not a slip in the details. */
+export const APPROACH_MISTAKE_TAGS: readonly MistakeTag[] = [
+  "wrong-approach",
+  "pattern-recall",
+  "greedy-invariant",
+];
 
 export interface SessionSnapshot {
   date: Date;
@@ -178,6 +227,8 @@ export interface TodayQueueBlock {
   reason: string;
   /** Re-solves: the calendar day it first fell due, "YYYY-MM-DD". */
   dueSince?: string;
+  /** Re-solves: the learner's last takeaway (P6.2), a pre-solve reminder. */
+  takeaway?: string;
 }
 
 /** Why today looks the way it does (banner, P5.3). */
@@ -259,6 +310,8 @@ export interface ResolvePlanSlot {
   promoted: boolean;
   /** Why it's in the pool ("2 mistakes, used coach") — the trust string. */
   reason: string;
+  /** P6.2: the learner's last one-line takeaway on this problem. */
+  takeaway?: string;
 }
 
 export interface PlanOptions {

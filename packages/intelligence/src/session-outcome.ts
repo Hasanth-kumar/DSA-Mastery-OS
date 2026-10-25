@@ -1,4 +1,4 @@
-import type { TopicDifficulty } from "./types.js";
+import type { HelpLevel, TopicDifficulty } from "./types.js";
 
 /**
  * Outcome-based session scoring (0–100).
@@ -25,6 +25,11 @@ export interface SessionOutcomeInput {
   /** In-app hint count (adds to the help penalty when heavy). */
   hintCount?: number;
   /**
+   * P6.1: captured help level. When present it sets the base instead of
+   * `usedHelp`: approach and full solution weigh more than a hint.
+   */
+  helpLevel?: HelpLevel | null;
+  /**
    * Mistake tags once captured. `undefined` = not captured yet, which gives a
    * provisional score that is re-computed when the tags arrive.
    */
@@ -34,6 +39,12 @@ export interface SessionOutcomeInput {
 const COULD_NOT_SOLVE = "could-not-solve";
 const COLD_BASE = 80;
 const HELP_BASE = 50;
+const HELP_LEVEL_BASE: Record<HelpLevel, number> = {
+  none: COLD_BASE,
+  hint: 70,
+  approach: HELP_BASE,
+  solution: 30,
+};
 const HEAVY_HINTS = 3;
 const MAX_TAG_PENALTY = 24;
 const PER_TAG_PENALTY = 8;
@@ -45,7 +56,11 @@ export function deriveSessionOutcomeScore(input: SessionOutcomeInput): number {
   const helped = input.usedHelp || hints > 0;
   const tags = [...new Set((input.mistakeTags ?? []).filter((t) => t.trim().length > 0))];
 
-  let score = helped ? HELP_BASE : COLD_BASE;
+  let score = input.helpLevel
+    ? HELP_LEVEL_BASE[input.helpLevel]
+    : helped
+      ? HELP_BASE
+      : COLD_BASE;
   if (hints >= HEAVY_HINTS) score -= 10;
 
   const realTags = tags.filter((t) => t !== COULD_NOT_SOLVE);

@@ -1,6 +1,7 @@
 import type {
   AdmissionReason,
   CompletionOutcome,
+  HelpLevel,
   IntelligenceOrchestrator,
   PoolBackfillItem,
   ProblemReviewConfig,
@@ -90,6 +91,7 @@ export interface ResolveDueSelection {
     topicId: string | null;
     daysOverdue: number;
     promoted: boolean;
+    takeaway?: string;
     reason: string;
   }[];
   totalDue: number;
@@ -235,6 +237,8 @@ export class ProblemReviewService {
           daysOverdue: slot.daysOverdue,
           promoted: slot.promoted,
           reason: this.describePool(slot.review.problemId, slot),
+          // P6.2: the last takeaway, as a pre-solve reminder.
+          ...this.takeawayFor(slot.review.problemId),
         };
       }),
       totalDue: active.length + deferred.length,
@@ -308,6 +312,12 @@ export class ProblemReviewService {
       leech,
       retired,
     };
+  }
+
+  private takeawayFor(problemId: string): { takeaway?: string } {
+    if (!this.config.flags.takeawayField) return {};
+    const takeaway = this.attemptRepo.latestTakeaway(problemId);
+    return takeaway ? { takeaway } : {};
   }
 
   /** In the pool and not retired: a solve of it is a re-solve (P4.2). */
@@ -525,7 +535,15 @@ function completionOf(a: AttemptRow, difficulty: string | null | undefined): Com
     difficulty: toDifficulty(difficulty),
     mistakeTags: parseMistakeTags(a.mistakeTag),
     usedHelp: a.usedCoach === 1 || (a.hintCount ?? 0) > 0,
+    helpLevel: asHelpLevel(a.helpLevel),
   };
+}
+
+/** A stored help level, or null for rows from before P6.1. */
+export function asHelpLevel(value: string | null | undefined): HelpLevel | null {
+  return value === "none" || value === "hint" || value === "approach" || value === "solution"
+    ? value
+    : null;
 }
 
 function toSignal(a: AttemptRow) {

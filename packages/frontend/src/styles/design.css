@@ -3384,3 +3384,39 @@ button.settings-row {
   letter-spacing: 0.06em;
   color: var(--text-subtle);
 }
+
+/* P6.1 / P6.2: MistakeCapture rows, the pattern reveal and the takeaway line. */
+.mistake-capture-row-label {
+  margin-top: 14px;
+}
+
+.mistake-capture-reveal {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.mistake-capture-takeaway {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.mistake-capture-takeaway:focus {
+  outline: none;
+  border-color: var(--accent-ring);
+}
+
+/* P6.2: the last takeaway on a re-solve row, in the reason's voice. */
+.problem-row-takeaway {
+  margin-top: -6px;
+  font-style: italic;
+}
