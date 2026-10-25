@@ -20,6 +20,15 @@ import {
   runDevMetrics,
 } from "../../../infrastructure/scripts/dev-metrics.mjs";
 
+// CI runs Node 20, which has no node:sqlite. Same skip as the other sqlite tests.
+const sqliteModule = "node:sqlite";
+let hasNodeSqlite = true;
+try {
+  await import(/* @vite-ignore */ sqliteModule);
+} catch {
+  hasNodeSqlite = false;
+}
+
 const script = resolve(
   dirname(fileURLToPath(import.meta.url)),
   "../../../infrastructure/scripts/dev-metrics.mjs",
@@ -206,7 +215,7 @@ describe("parseMistakeTags", () => {
   });
 });
 
-describe("dev metrics", () => {
+describe.skipIf(!hasNodeSqlite)("dev metrics", () => {
   it("prints the baseline counts and hides row text", () => {
     const root = makeRepo();
     const devDb = join(root, "data/dev/dsa.dev.db");

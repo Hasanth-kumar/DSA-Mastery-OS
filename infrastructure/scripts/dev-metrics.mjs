@@ -22,12 +22,20 @@ import { copyFileSync, existsSync, lstatSync, mkdtempSync, rmSync } from "node:f
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
-import { DatabaseSync } from "node:sqlite";
 import {
   assertInsideDevDir,
   findRepoRoot,
   resolveDevDbPaths,
 } from "./dev-db.mjs";
+
+// Node 20 (CI) has no node:sqlite. Node 22.5+ does. Importing on demand lets
+// the refusal checks and parseMistakeTags load on either runtime.
+let DatabaseSync;
+try {
+  ({ DatabaseSync } = await import("node:sqlite"));
+} catch {
+  DatabaseSync = undefined;
+}
 
 const ACTIVE_TOPIC_KEY = "curriculum_active_topic_id";
 
