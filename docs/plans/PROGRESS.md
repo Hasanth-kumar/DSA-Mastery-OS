@@ -29,7 +29,7 @@
 | P6.3 | done | df06b1d | `MistakeTag` single source; +greedy-invariant, +loop-bounds |
 | P6.4 | dropped | | D6: not built |
 | P7.1 | done | 5619e0e | `topic-tiers.md` approved with changes [D13] |
-| P7.2 | done | (see log) | `topic-prerequisites.ts`: 30 approved edges, doc-checked; curriculum + graph behind `curriculumV2` |
+| P7.2 | done | 09bb9fb | `topic-prerequisites.ts`: 30 approved edges, doc-checked; curriculum + graph behind `curriculumV2` |
 | P7.3 | todo | | |
 | P7.4 | todo | | |
 | P7.5 | todo | | |
