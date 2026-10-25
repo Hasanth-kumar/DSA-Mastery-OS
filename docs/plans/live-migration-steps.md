@@ -4,6 +4,8 @@ The runbook for turning the overhaul on in the **live** app, for Santosh to run.
 
 The live app runs from `~/Desktop/dsa-mastery-os` on `main`, with `SQLITE_PATH=./data/sqlite/dsa.db` and `PORT=3000`. Every command below runs from that folder. Allow about 30 minutes for steps 0–6; the flags in step 7 go on over a week or two.
 
+**Dry run (P8.2, 2026-10-25).** Every step below was run on a copy of the live DB taken that day (last session 2026-10-24), with the overhaul build, Notion, WhatsApp and the LLM off. All steps behaved as written; the "What to expect" numbers below are from that copy. It found one curriculum problem (patterns started in July would have run before DP), fixed as D14 before merge. The live file was only read (checksum unchanged).
+
 ## At a glance
 
 | # | Step | App | Undo |
@@ -86,7 +88,7 @@ pnpm db:repair-schedules --apply      # backs up into data/backups/, then applie
 pnpm db:repair-schedules              # should now say "Nothing to do"
 ```
 
-What to expect: on the 2026-10-19 copy of the live data (the dev DB), the dry run listed 5 topics:
+What to expect: on the 2026-10-25 live copy the dry run listed 6 topics:
 
 | Topic | Confidence | Interval | Next review |
 |---|---|---|---|
@@ -94,7 +96,10 @@ What to expect: on the 2026-10-19 copy of the live data (the dev DB), the dry ru
 | Fast & Slow Pointers | 30% | 1459 → 7 days | 2030-10-09 → tomorrow |
 | Two Pointers | 53% | 456 → 21 days | 2027-12-19 → tomorrow |
 | BFS | 22% | 380 → 7 days | 2027-09-17 → tomorrow |
+| Greedy Sorting | 28% | 49 → 7 days | 2026-12-11 → 2026-10-30 |
 | Binary Search + Prefix Sum | 43% | 42 → 21 days | unchanged (already due) |
+
+`--apply` backed up first, the re-run said "Nothing to do", query 8.4 was empty and 8.7 listed 6 pending pushes.
 
 Live data has moved on since then, so the list may differ. Read it before `--apply`. Anything with a date years out, or an interval in the hundreds, is the bug being fixed.
 
@@ -114,7 +119,7 @@ pnpm db:backfill-resolve-pool --apply    # backs up into data/backups/, then add
 pnpm db:backfill-resolve-pool            # should now say "Nothing to do"
 ```
 
-What to expect: on the dev DB it added 5 (Maximum Depth of N-ary Tree, Two Sum, Subsets, Subsets II, Maximum Sum Subarray of Size K). Due dates are spread one per day, oldest first, so only one lands today.
+What to expect: on the 2026-10-25 live copy it added 5 (Maximum Depth of N-ary Tree, Two Sum, Subsets, Subsets II, Maximum Sum Subarray of Size K), `problem_reviews` 39 → 44. Due dates are spread one per day, oldest first, so only one lands today. `--revert` took it back to 39 and a second `--apply` to 44 again.
 
 Verify: query 8.5 returns 0.
 
@@ -125,12 +130,12 @@ Rollback: `pnpm db:backfill-resolve-pool --revert` removes exactly the rows `--a
 ```bash
 pnpm study
 curl -s http://127.0.0.1:3000/api/flags      # every value false
-curl -s http://127.0.0.1:3000/health         # status "ok"
+curl -s http://127.0.0.1:3000/health         # status "ok" (sqlite and notion "ok")
 ```
 
-Live is pinned to Greedy Sorting (the dev copy was). A pin from before the merge has no date, so its 7-day clock starts the first time the app plans the day. To clear it right away, do either:
+Live is pinned to **Greedy + Sorting with Prefix** (on the 2026-10-25 copy). A pin from before the merge has no date, so its 7-day clock starts the first time the app plans the day. To clear it right away, do either:
 
-- On Today, tap **Unpin** next to "Pinned · Greedy Sorting".
+- On Today, tap **Unpin** next to "Pinned · Greedy + Sorting with Prefix".
 - Or from a terminal:
 
   ```bash
@@ -138,7 +143,7 @@ Live is pinned to Greedy Sorting (the dev copy was). A pin from before the merge
     -H 'Content-Type: application/json' -d '{"topicId": null}'
   ```
 
-Verify: Today no longer shows "Pinned" and the hero names the curriculum's next topic (BFS on the dev copy); query 8.6 shows empty values. Click through Today, Re-solve, Review and Coach once: apart from the list at the top of §0 they behave as before the merge. Use the app like this for a day before step 7.
+Verify: Today no longer shows "Pinned" and the hero names the curriculum's next topic (DFS (Tree/Graph) on the live copy, which already has 2 problems covered); query 8.6 shows empty values. Click through Today, Re-solve, Review and Coach once: apart from the list at the top of §0 they behave as before the merge. Use the app like this for a day before step 7.
 
 Rollback: pin it again from Settings → Curriculum → Switch.
 
@@ -172,7 +177,9 @@ Check: log one problem with Help = Hint and a takeaway; the problem's note ends 
 | `FLAG_CURRICULUM_V2=true` | Curriculum ranking and the Graph tab use only the 30 approved hard prerequisites (`topic-tiers.md` §4, P7.2) | Nothing | The old merged prerequisites return |
 | `FLAG_SPIRAL_PASSES=true` | With the two above, Today comes from the two-loop selector: short blocks for new patterns (pattern shown), mixed days (patterns hidden everywhere), one basics problem offered a day while a basic is below pass 1, consolidation days, the consolidation loop (P7.3–P7.5). "Up next" and "step N of M" are hidden | Nothing new (it keeps no state of its own) | Today goes back to one topic a day (P3.4) |
 
-Before group C, run `pnpm dev:simulate-plan` in the overhaul worktree on a fresh copy of the dev DB to see the next 14 days. Check: on the first day Today reads "New pattern: Dynamic Programming (1D)" (if DP is still untouched), with one hidden basics problem; once DP's block is done, "Mixed practice" with no pattern named in the hero, strip, nav or rows.
+Before group C, run `pnpm dev:simulate-plan` in the overhaul worktree on a fresh copy of the live DB (put it at `data/dev/…` and point `DSA_DB_PATH` at it) to see the next 14 days. Check: on the first day Today reads "New pattern: Dynamic Programming (1D)" (if DP is still untouched), with one hidden basics problem; once DP's block is done, "Mixed practice" with no pattern named in the hero, strip, nav or rows.
+
+On the 2026-10-25 live copy: days 1–4 DP (1D) block (Climbing Stairs, Min Cost Climbing Stairs, Coin Change, Count Vowels Permutation), each with one basics problem; then mixed days, where DFS (Tree/Graph) and Prefix Sum, started in July, come back hidden (D14) and Binary Search + Greedy waits for Binary Search; Greedy + Sorting with Prefix finishes its block once Prefix Sum reaches pass 1.
 
 ## 8. Verification queries
 
@@ -182,7 +189,7 @@ Read-only. Run with the app stopped, or add `-readonly`:
 sqlite3 -readonly data/sqlite/dsa.db "<query>"
 ```
 
-**8.1 Counts (before step 2 and after step 6).** Only `problem_reviews` should grow, by the number step 5 added.
+**8.1 Counts (before step 2 and after step 6).** Only `problem_reviews` should grow, by the number step 5 added. On the 2026-10-25 copy: 50 / 291 / 66 / 45 / 39 / 40 before, reviews 44 after.
 
 ```sql
 SELECT (SELECT count(*) FROM topics) AS topics, (SELECT count(*) FROM problems) AS problems,
@@ -203,12 +210,13 @@ SELECT name FROM pragma_table_info('problem_attempts')
  WHERE name IN ('help_level', 'help_source', 'pattern_guess', 'takeaway');
 ```
 
-**8.4 No review schedule past its cap.** Expect no rows.
+**8.4 No review interval past its confidence cap** (the caps step 4 uses). Expect no rows after step 4; before it, the same topics the dry run lists.
 
 ```sql
 SELECT name, confidence, sm2_interval, date(next_revision_at / 1000, 'unixepoch') AS next_review
   FROM topics
- WHERE sm2_interval > 120 OR next_revision_at > (strftime('%s', 'now') + 121 * 86400) * 1000;
+ WHERE sm2_interval > CASE WHEN confidence < 40 THEN 7 WHEN confidence < 60 THEN 21
+                           WHEN confidence < 80 THEN 45 ELSE 120 END;
 ```
 
 **8.5 Every "Revision needed" problem is in the re-solve pool.** Expect 0.
@@ -244,6 +252,8 @@ curl -s http://127.0.0.1:3000/api/plan/today | python3 -c 'import json,sys; p=js
 
 ## 9. Rollback
 
+Whenever you copy a database file back, delete its `-wal` and `-shm` files first. In the dry run, a leftover `-wal` silently replayed a test solve onto a restored copy.
+
 **Level 1: a flag misbehaves.** Delete its line from `.env` and restart. No data to undo; the table in step 7 says what each one leaves behind. Turn off group C before group A (C depends on A).
 
 **Level 2: a data step went wrong.**
@@ -260,7 +270,7 @@ pnpm install && pnpm build
 ```
 
 Then either:
-- **Keep the data** (sessions logged since the merge stay). `main` without the overhaul ignores the four 0017 columns. To drop them anyway: `sqlite3 data/sqlite/dsa.db < database/migrations/down/0017_attempt_signals.down.sql` (back up first; it needs SQLite 3.35+, which macOS has).
+- **Keep the data** (sessions logged since the merge stay). `main` without the overhaul ignores the four 0017 columns: in the P8.2 dry run, `main` at `f60c5dc` booted on the fully migrated copy and served Today with no errors. To drop them anyway: `sqlite3 data/sqlite/dsa.db < database/migrations/down/0017_attempt_signals.down.sql` (back up first; it needs SQLite 3.35+, which macOS has). Dry run: dropped exactly the four columns, kept all 66 attempts, integrity `ok`.
 - **Or restore step 1's backup** over `data/sqlite/dsa.db` (and remove any newer `-wal` / `-shm`). Everything done since step 1 is lost, and Notion still has anything a sync pushed since.
 
 `FLAG_…` lines left in `.env` are ignored by the old code.
