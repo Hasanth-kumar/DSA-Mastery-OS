@@ -29,7 +29,7 @@
 | P6.3 | done | df06b1d | `MistakeTag` single source; +greedy-invariant, +loop-bounds |
 | P6.4 | dropped | | D6: not built |
 | P7.1 | done | 5619e0e | `topic-tiers.md` approved with changes [D13] |
-| P7.2 | todo | | |
+| P7.2 | done | (see log) | `topic-prerequisites.ts`: 30 approved edges, doc-checked; curriculum + graph behind `curriculumV2` |
 | P7.3 | todo | | |
 | P7.4 | todo | | |
 | P7.5 | todo | | |
@@ -38,6 +38,15 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-25 — P7.2 Promote prerequisites to a shared DAG
+- Did: `intelligence/src/roadmap-engine/topic-prerequisites.ts` holds the 30 approved hard prerequisites (`topic-tiers.md` §4) by exact topic name, generated from the same data as the doc, plus `BASIC_TOPICS`, `CORE_TOPIC_ORDER`, `LATER_TOPIC_ORDER` for P7.4. `buildHardPrerequisiteEdges` matches by exact name with punctuation folded (curly vs straight apostrophes), no aliases or partial matches ("Binary Search Tree" never matches "Binary Search"). With `curriculumV2` on, `CurriculumService` ranks with these edges only and the Knowledge Graph draws only these; flag off keeps `buildTopicGraphEdges` (Notion prerequisites + roadmap + visual links). `graph-edges.ts` is left in place for the flag-off path; delete after merge.
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (shared 23, intelligence 210, integrations 200, backend 156). `topic-prerequisites.test.ts` (6): the list equals the doc's §4 table (parsed from the markdown, so doc and code can't drift), acyclic (and the checker catches a planted cycle), all 50 topics once, prerequisites earlier in the order or basic, exact-name matching, per-topic lookup. `hard-prerequisites.test.ts` (2): the old links make Union-Find wait for DFS; the approved list doesn't.
+- Data check (copy of the dev DB): all 30 edges resolve (old merged links: 56). Primary topic unchanged either way: Greedy Sorting, held as the current topic.
+- Browser check: the Knowledge Graph with the flag on draws the 30 edges; basics without prerequisites stand alone.
+- Design check: no visual change beyond which edges are drawn.
+- Note: Notion `prerequisites` relations are not read with the flag on; the approved list is the only source. None exist in the dev DB.
+- Next suggested task: P7.3.
+
 ### 2026-10-25 — P7.1 Introduction order and hard prerequisites (draft)
 - Did: `docs/plans/topic-tiers.md`, generated from the 50 dev-DB topics with problem counts and the D3 pass-1 size of each. Three groups: **Basics** (11 started or familiar patterns: no intro block, outside the 3-open cap, count as satisfied prerequisites), **Core** (21, in exposure-loop order: Greedy Sorting, DP 1D, DFS, Prefix Sum, Stack + String, Monotonic Stack, Top-K, DP on Subsequences, …; 86 problems to pass 1), **Later** (18: advanced, rare, or too few problems). 30 hard prerequisites, checked by script: all 50 names match the DB exactly, each appears once, and every prerequisite comes earlier in the order or is a basic. Section 5 lists where it differs from `graph-edges.ts`.
 - Found while drafting: if basics had to reach pass 1 before counting as prerequisites, the 11 of them would fill P7.4's 3-open cap and nothing new could be introduced; and "Heap (Priority Queue)" is 2 Hard problems only, so as a prerequisite it would block Top-K, Greedy with Heap and Dijkstra. Both are decisions in the doc (§6).
