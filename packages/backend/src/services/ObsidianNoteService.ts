@@ -24,8 +24,9 @@ export interface NoteTemplateResult {
 /**
  * Read-only Obsidian vault ingestion (Phase 2). Watches the vault, matches
  * notes to problems (frontmatter slug first, filename fallback), and mirrors
- * metadata + content into SQLite. Existing notes are never modified; the only
- * write is creating brand-new template files (2.4).
+ * metadata + content into SQLite. Existing note content is never rewritten.
+ * Writes: creating brand-new template files (2.4), and appending a dated
+ * takeaway line to the end of an existing note (P6.2, `takeawayField`).
  */
 export class ObsidianNoteService {
   private readonly vault: ObsidianVault | null;
