@@ -33,11 +33,18 @@
 | P7.3 | done | 198ff73 | `topic-pass.ts`: passes 0–3 + evidence; 41 tests; dev DB: 6 topics at pass 1, none at 2 |
 | P7.4 | done | 3ffc657 | `two-loop-selector.ts`; 18 scenario tests; dev-DB run: DP (1D) block + one basic a day |
 | P7.5 | done | bb84c82 | two-loop queue behind `curriculumV2` + `spiralPasses` (+ `todayQueueV2`); `pnpm dev:simulate-plan` |
-| P8.1 | todo | | |
+| P8.1 | done | fcdebbd | `live-migration-steps.md`: 10 sections, flags in 3 groups, queries checked on a dev copy |
 | P8.2 | todo | | |
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-25 — P8.1 Live migration runbook
+- Santosh: "Lets go ahead with it" after P7.5, read as: keep D13's three-problem day (~105 min when all Medium) and start P8.1.
+- Did: completed `docs/plans/live-migration-steps.md`. At-a-glance table; preconditions (P8.2 done, live `main` clean, `overhaul` pushed, live `.env` free of worktree overrides); what lands with every flag off (`bb8cfb6` outcome scoring, P3.1 covered rule, P3.3 pin expiry, P3.4 topic choice, P3.5 stage difficulty, P6.3 tags, Graph edges); stop + backup (DB, WAL, the pre-merge commit, the vault before `takeawayField`); `git merge --no-ff origin/overhaul` so one `git revert -m 1` undoes it; migration 0017 (runs by itself; no migrations table, every file re-runs on open); P2.2 repair; P3.2 backfill; first start with flags off + P3.3 unpin; the seven flags in three groups (A: hideTopicRevision, unifiedCompletion, todayQueueV2; B: helpLevelCapture, takeawayField; C: curriculumV2, spiralPasses), each with what changes, what it writes and what turning it off leaves; eight verification checks; rollback at three levels (flag, data step, whole merge with keep-data or restore-backup).
+- Checked against the code and data: live is on `main` at `f60c5dc`, which is the merge base, so the merge brings 65 commits including `bb8cfb6`. The live `.env` sets none of the worktree overrides or flags (keys only read). All seven SQL checks run on a copy of the dev DB: counts 50 / 286 / 51 / 39 / 38 / 40, integrity `ok`, 0017 columns absent there (the dev file isn't migrated yet: the "before" state), no schedule past its cap, 0 unpooled `Revision needed`, pin values empty, 5 repaired topics pending a Notion push. Route and method of the unpin call, script names and backup behaviour checked in the source.
+- Tests: docs only; none run.
+- Next suggested task: P8.2 (needs a fresh copy of the live DB from Santosh).
+
 ### 2026-10-25 — P7.5 Wire the two-loop selector into PlanService; compare old vs new
 - Santosh: "go ahead" after P7.4.
 - Did:
