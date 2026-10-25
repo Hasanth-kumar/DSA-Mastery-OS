@@ -1,6 +1,7 @@
 import { watch, type FSWatcher } from "chokidar";
 import { createHash } from "node:crypto";
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   readdirSync,
@@ -8,7 +9,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { basename, extname, join, relative } from "node:path";
+import { basename, extname, isAbsolute, join, relative } from "node:path";
 import { slugifyProblemName } from "../util/slugify.js";
 
 export interface ObsidianNoteFile {
@@ -118,8 +119,9 @@ export function resolveTopicFolderName(
 }
 
 /**
- * Read-only Obsidian vault access. The system never modifies existing notes;
- * the only write path is `createNoteFile`, which refuses to overwrite.
+ * Obsidian vault access. Existing note content is never rewritten. The write
+ * paths are `createNoteFile`, which refuses to overwrite, and `appendToNote`
+ * (P6.2), which only adds text to the end of an existing markdown note.
  */
 export class ObsidianVault {
   private watcher: FSWatcher | null = null;
@@ -146,6 +148,21 @@ export class ObsidianVault {
     const absolute = join(this.vaultPath, relativePath);
     if (!existsSync(absolute)) return null;
     return this.toNote(absolute);
+  }
+
+  /**
+   * P6.2: append text to the end of an existing `.md` note inside the vault.
+   * Refuses paths outside the vault and files that don't exist.
+   */
+  appendToNote(relativePath: string, text: string): boolean {
+    if (!this.isConfigured() || isAbsolute(relativePath) || extname(relativePath) !== ".md") {
+      return false;
+    }
+    const absolute = join(this.vaultPath, relativePath);
+    const rel = relative(this.vaultPath, absolute);
+    if (rel.startsWith("..") || isAbsolute(rel) || !existsSync(absolute)) return false;
+    appendFileSync(absolute, text, "utf-8");
+    return true;
   }
 
   /** Watch for created/modified/deleted markdown files. */

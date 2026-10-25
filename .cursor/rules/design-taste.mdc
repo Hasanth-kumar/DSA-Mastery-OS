@@ -1,0 +1,15 @@
+---
+description: Design taste and house style are binding for all work in this repo
+alwaysApply: true
+---
+
+# Design taste (binding)
+
+Before changing code in this repository, read `docs/design-taste-and-preferences.md` in full and follow it.
+
+- Frontend work: follow §2 (visual aesthetic, "Atelier Editorial") and §3 (UX principles). Reuse existing tokens, fonts and components; no new colors, shadows, boxed card grids or pills.
+- Engine, service and backend work: follow §4 (architecture house style). `@dsa/intelligence` engines stay pure and I/O-free; wiring goes in `context.ts`.
+- Hot paths (warm-up, review, re-solve, Today) stay zero-LLM and zero-network.
+- If a request conflicts with the design doc, follow the doc and say so.
+
+See also `CLAUDE.md` and `AGENTS.md`.

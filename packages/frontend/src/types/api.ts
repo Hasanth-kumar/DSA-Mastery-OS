@@ -14,6 +14,7 @@ import type {
   ResolvePlanSlot,
   ResolveRating,
   RevisionProblem,
+  TodayQueue,
   TopicDifficulty,
   TopicStatus,
   WeaknessTrendPoint,
@@ -32,6 +33,9 @@ export type {
   ResolveRating,
   RevisionProblem,
   StreakInfo,
+  TodayQueue,
+  HelpLevel,
+  HelpSource,
   TopicDifficulty,
   TopicDifficultyAlignment,
   TopicStatus,
@@ -85,8 +89,46 @@ export interface CurriculumState {
   } | null;
 }
 
+export type FocusMode = "normal" | "reentry" | "done";
+
+export interface FocusBlock {
+  kind: "resolve" | "learn" | "log";
+  title: string;
+  minutes: number;
+  instruction: string;
+  problemId?: string;
+  leetcodeLink?: string;
+  difficulty?: TopicDifficulty;
+  topicName?: string;
+}
+
+export interface FocusPlan {
+  mode: FocusMode;
+  headline: string;
+  reason: string;
+  totalMinutes: number;
+  blocks: FocusBlock[];
+  week: { target: number; done: number; remaining: number; daysLeft: number; onTrack: boolean };
+  gapDays: number;
+  tip: { tag: string; count: number; checklist: string[] } | null;
+}
+
+/** Overhaul feature flags (`GET /api/flags`, read-only; `FLAG_<NAME>` in the backend `.env`). */
+export interface FeatureFlags {
+  todayQueueV2: boolean;
+  unifiedCompletion: boolean;
+  /** Topic SM-2 retired: Today hides the Revision column and the post-solve revision offer (P4.3). */
+  hideTopicRevision: boolean;
+  helpLevelCapture: boolean;
+  takeawayField: boolean;
+  curriculumV2: boolean;
+  spiralPasses: boolean;
+}
+
 export interface StudyPlan {
   date: string;
+  /** Time-boxed daily plan; absent on cached plans from before this field existed. */
+  focus?: FocusPlan;
   primaryTopic: Topic;
   revisionTopics: Topic[];
   /** Optional: cached plans from before this field existed won't have it. */
@@ -107,6 +149,8 @@ export interface StudyPlan {
   resolveSlots?: ResolvePlanSlot[];
   resolveTotalDue?: number;
   resolveDeferred?: number;
+  /** P5.1: Today's single ordered list of problems (`todayQueueV2`). */
+  queue?: TodayQueue;
 }
 
 export type ResolveOutcomeKind = "solved" | "assisted" | "failed";

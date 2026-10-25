@@ -77,6 +77,10 @@ export interface TopicSignalExtras {
   notedProblemIds?: ReadonlySet<string>;
   /** Coach-assisted vs total recent attempts (D4). */
   coachAssist?: { assisted: number; solved: number };
+  /** Latest attempt on this topic was tagged could-not-solve (P3.5). */
+  lastAttemptCouldNotSolve?: boolean;
+  /** Active re-solve due dates for FSRS urgency (P4.1); omit to keep SM-2 urgency. */
+  resolveDueAt?: (Date | null)[];
 }
 
 /**
@@ -135,6 +139,8 @@ export function buildTopicState(
     ...state,
     mistakeTagCounts: extras.mistakeTagCounts ?? {},
     coachAssist: extras.coachAssist,
+    lastAttemptCouldNotSolve: extras.lastAttemptCouldNotSolve ?? false,
+    ...(extras.resolveDueAt ? { resolveDueAt: extras.resolveDueAt } : {}),
     noteCoverage: {
       solved: solved.length,
       withNotes: extras.notedProblemIds

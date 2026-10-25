@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  createBatchGenerationClient,
   createGenerationClient,
   createOllamaGenerationClient,
   type GenerationClient,
@@ -46,6 +47,23 @@ describe("createGenerationClient — local-first fallback chain (§14)", () => {
   it("isConfigured is true if either link is configured", () => {
     expect(createGenerationClient({ local: fixed("x", false), cloud: fixed("y") }).isConfigured()).toBe(true);
     expect(createGenerationClient({ local: fixed("x", false), cloud: fixed("y", false) }).isConfigured()).toBe(false);
+  });
+});
+
+describe("createBatchGenerationClient", () => {
+  it("does not call fetch when the provider is mock", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const client = createBatchGenerationClient({
+      provider: "mock",
+      cloud: { apiKey: "should-not-be-used", model: "google/gemma" },
+    });
+    expect(client.isConfigured()).toBe(true);
+    expect(await client.generate("prompt")).toBe("[mock] outbound LLM disabled");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("LLM_PROVIDER=mock"));
+    fetchSpy.mockRestore();
+    warn.mockRestore();
   });
 });
 

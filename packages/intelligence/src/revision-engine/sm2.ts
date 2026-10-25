@@ -11,11 +11,24 @@ export function readSM2State(topic: TopicState, now: Date = new Date()): SM2Stat
   };
 }
 
-/** SM-2 quality: 0–5 (0 = blackout, 5 = perfect). */
+/**
+ * Longest allowed review interval (days) for a topic at a given confidence.
+ * Plain SM-2 grows intervals geometrically, which pushed a 30%-confidence topic
+ * out to 2030. Low confidence must keep coming back soon.
+ */
+export function maxIntervalDaysForConfidence(confidence: number): number {
+  if (confidence < 40) return 7;
+  if (confidence < 60) return 21;
+  if (confidence < 80) return 45;
+  return 120;
+}
+
+/** SM-2 quality: 0–5 (0 = blackout, 5 = perfect). `maxInterval` caps the new interval in days. */
 export function sm2Update(
   state: SM2State,
   quality: number,
   now: Date = new Date(),
+  maxInterval: number = Number.POSITIVE_INFINITY,
 ): SM2State {
   if (quality < 3) {
     return {
@@ -36,6 +49,7 @@ export function sm2Update(
   if (state.repetition === 0) newInterval = 1;
   else if (state.repetition === 1) newInterval = 6;
   else newInterval = Math.round(state.interval * newEfactor);
+  newInterval = Math.max(1, Math.min(newInterval, maxInterval));
 
   return {
     interval: newInterval,

@@ -9,6 +9,7 @@ import type { AppConfig, CoachModelOption } from "@dsa/shared";
 export function toCoachLLMServiceConfig(config: AppConfig): LLMServiceConfig {
   const modelApiKeys = coachModelApiKeys(config);
   return {
+    provider: config.llm.provider,
     model: config.coachLlm.model,
     models: [config.coachLlm.model, ...config.coachLlm.fallbackModels],
     modelApiKeys,
@@ -39,6 +40,7 @@ export function toCoachModelServiceConfig(
 ): LLMServiceConfig {
   const modelApiKeys = coachModelApiKeys(config);
   return {
+    provider: config.llm.provider,
     model: option.model,
     // When the user picks a specific model, still fall back to the configured chain.
     models: [option.model, ...config.coachLlm.fallbackModels.filter((m) => m !== option.model)],

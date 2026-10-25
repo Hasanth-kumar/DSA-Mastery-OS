@@ -51,6 +51,9 @@ beforeEach(() => {
   testDbPath = join(tmpdir(), `dsa-attempts-${Date.now()}-${Math.random()}.db`);
   resetConfigCache();
   process.env.SQLITE_PATH = testDbPath;
+  // DSA_DB_PATH wins over SQLITE_PATH and a worktree .env sets it; pin both so
+  // loadConfig() never resolves to data/dev/dsa.dev.db.
+  process.env.DSA_DB_PATH = testDbPath;
   config = loadConfig();
   seed(testDbPath);
   ctx = createAppContext(config);
@@ -64,6 +67,7 @@ afterEach(async () => {
     // ignore
   }
   delete process.env.SQLITE_PATH;
+  delete process.env.DSA_DB_PATH;
   resetConfigCache();
 });
 

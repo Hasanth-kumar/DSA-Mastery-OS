@@ -2,6 +2,8 @@ export interface WhatsAppClientConfig {
   phoneNumberId: string;
   accessToken: string;
   apiVersion?: string;
+  /** When false, `sendText` is a logged no-op and never calls Graph API. */
+  enabled?: boolean;
 }
 
 export interface SendTextResult {
@@ -21,6 +23,13 @@ export class WhatsAppClient {
   }
 
   async sendText(to: string, body: string): Promise<SendTextResult> {
+    if (this.config.enabled === false) {
+      console.warn(
+        `[whatsapp] send skipped to ${to.replace(/\D/g, "")}: WHATSAPP_ENABLED=false`,
+      );
+      return { messageId: "whatsapp-disabled" };
+    }
+
     const recipient = to.replace(/\D/g, "");
     const text = body.length > 4096 ? `${body.slice(0, 4093)}...` : body;
 

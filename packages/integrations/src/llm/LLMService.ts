@@ -7,6 +7,7 @@ import type {
   HintContext,
 } from "../prompts/types.js";
 import type { LLMClient } from "./LLMClient.js";
+import { createMockLLMClient } from "./MockLLMClient.js";
 import { createOpenRouterClient } from "./OpenRouterClient.js";
 
 export interface ChatHistoryMessage {
@@ -15,6 +16,8 @@ export interface ChatHistoryMessage {
 }
 
 export interface LLMServiceConfig {
+  /** `mock` and `disabled` never construct an OpenRouter client. */
+  provider?: "openrouter" | "mock" | "disabled";
   model: string;
   /** Fallback chain tried after `model` fails (coach resilience). */
   models?: string[];
@@ -35,7 +38,9 @@ export class LLMService {
   constructor(config: LLMServiceConfig, client?: LLMClient) {
     this.client =
       client ??
-      createOpenRouterClient({
+      (config.provider === "mock" || config.provider === "disabled"
+        ? createMockLLMClient(config.provider)
+        : createOpenRouterClient({
         apiKey: config.openrouter.apiKey,
         model: config.model,
         models: config.models,
@@ -44,7 +49,7 @@ export class LLMService {
         siteUrl: config.openrouter.siteUrl,
         siteName: config.openrouter.siteName,
         timeoutMs: config.timeoutMs,
-      });
+      }));
   }
 
   isConfigured(): boolean {

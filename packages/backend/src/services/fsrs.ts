@@ -33,6 +33,11 @@ export const LEECH_LAPSE_THRESHOLD = 8;
 // Deterministic scheduler (no fuzz) shared across reviews.
 const scheduler = fsrs(generatorParameters({ enable_fuzz: false }));
 
+// P4.2: a re-solve is a 20–45 min cold solve, so its next review is days away.
+// ts-fsrs's default short-term learning steps (1 min / 10 min) would make a
+// fresh problem due again the same day and put it back on Today.
+const dayScheduler = fsrs(generatorParameters({ enable_fuzz: false, enable_short_term: false }));
+
 /**
  * Map a 0–5 self-grade (the warm-up/review scale) to an FSRS rating.
  * `<3` = forgot → Again, `3` = Hard, `4` = Good, `5` = Easy. The frontend
@@ -112,8 +117,14 @@ export function resolveRatingToGrade(rating: ResolveRating): Grade {
  * Apply one explicit FSRS rating to any FSRS-bearing row (problem re-solve
  * path — cards go through {@link reviewRow}'s self-grade scale instead).
  */
-export function applyFsrsRating(row: FsrsFields, rating: Grade, nowMs: number): ReviewPatch {
-  const { card } = scheduler.next(rowToFsrsCard(row, nowMs), new Date(nowMs), rating);
+export function applyFsrsRating(
+  row: FsrsFields,
+  rating: Grade,
+  nowMs: number,
+  options: { shortTermSteps?: boolean } = {},
+): ReviewPatch {
+  const s = options.shortTermSteps === false ? dayScheduler : scheduler;
+  const { card } = s.next(rowToFsrsCard(row, nowMs), new Date(nowMs), rating);
   return fsrsCardToPatch(card);
 }
 

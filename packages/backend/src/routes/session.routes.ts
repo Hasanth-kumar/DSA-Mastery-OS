@@ -1,3 +1,4 @@
+import { HELP_LEVELS, HELP_SOURCE_LABELS, type HelpLevel, type HelpSource } from "@dsa/intelligence";
 import type { FastifyInstance } from "fastify";
 import type { AppContext } from "../context.js";
 import { serializeForJson } from "../lib/json.js";
@@ -76,7 +77,8 @@ export async function sessionRoutes(
 
   app.post<{
     Body: {
-      topicId: string;
+      /** Optional when `problemId` is given: the problem's own topic is used. */
+      topicId?: string;
       problemsSolved?: number;
       studyDuration: number;
       productivityScore?: number;
@@ -88,7 +90,6 @@ export async function sessionRoutes(
     };
   }>("/session", async (request, reply) => {
     const {
-      topicId,
       problemsSolved,
       studyDuration,
       date,
@@ -97,6 +98,10 @@ export async function sessionRoutes(
       mistakeTag,
       warmupGraded,
     } = request.body;
+
+    const topicId =
+      request.body.topicId ||
+      (problemId ? (ctx.problemRepo.findById(problemId)?.topicId ?? undefined) : undefined);
 
     if (!topicId || studyDuration == null) {
       return reply.status(400).send({
@@ -126,25 +131,70 @@ export async function sessionRoutes(
 
   // Mistake capture (1.4) — PATCHes the attempt created by POST /session.
   // Multi-select tags + optional "used coach" override (D3); empty = a smooth solve.
+  // P6.1 / P6.2: optional help level + source and a one-line takeaway.
   app.patch<{
     Params: { id: string };
-    Body: { tags?: string[]; usedCoach?: boolean };
+    Body: {
+      tags?: string[];
+      usedCoach?: boolean;
+      helpLevel?: string;
+      helpSource?: string;
+      takeaway?: string;
+    };
   }>("/attempts/:id/mistake", async (request, reply) => {
+    const { helpLevel, helpSource, takeaway } = request.body;
+    if (helpLevel != null && !HELP_LEVELS.includes(helpLevel as HelpLevel)) {
+      return reply.status(400).send({ error: `helpLevel must be one of ${HELP_LEVELS.join(", ")}` });
+    }
+    if (helpSource != null && !(helpSource in HELP_SOURCE_LABELS)) {
+      return reply.status(400).send({ error: "helpSource must be coach, external-ai or other" });
+    }
     const attempt = ctx.attemptRepo.setMistake(request.params.id, {
       tags: request.body.tags ?? [],
       usedCoach: request.body.usedCoach,
+      helpLevel: helpLevel as HelpLevel | undefined,
+      helpSource: helpSource as HelpSource | undefined,
+      takeaway,
     });
     if (!attempt) {
       return reply.status(404).send({ error: "Attempt not found" });
     }
+    // P6.2: append the takeaway to the problem's existing note (dev vault in the worktree).
+    if (ctx.config.flags.takeawayField && attempt.takeaway) {
+      ctx.obsidianNotes.appendTakeaway(attempt.problemId, attempt.takeaway, new Date());
+    }
     await ctx.sessionService.finalizeProblemAfterMistake(
       attempt.problemId,
       parseMistakeTags(attempt.mistakeTag),
+      attempt,
     );
+    // The outcome (tags + "needed help") is now known: re-score the session.
+    await ctx.sessionService.rescoreAfterMistakeCapture(attempt);
+    ctx.events.publish("session");
     ctx.events.publish("attempt");
     ctx.events.publish("problem");
     return reply.send(serializeForJson({ attempt }));
   });
+
+  // P6.1: "Which pattern did you use?" on a hidden-pattern row. Stores the
+  // guess, then reveals the real pattern.
+  app.post<{ Params: { id: string }; Body: { guess?: string } }>(
+    "/attempts/:id/pattern-guess",
+    async (request, reply) => {
+      const guess = request.body.guess?.trim();
+      if (!guess) return reply.status(400).send({ error: "guess is required (a topic id or \"unsure\")" });
+      const attempt = ctx.attemptRepo.setPatternGuess(request.params.id, guess);
+      if (!attempt) return reply.status(404).send({ error: "Attempt not found" });
+      const topicId = ctx.problemRepo.findById(attempt.problemId)?.topicId ?? attempt.topicId;
+      const topic = topicId ? ctx.topicRepo.findById(topicId) : null;
+      ctx.events.publish("attempt");
+      return reply.send({
+        topicId: topic?.id ?? null,
+        topicName: topic?.name ?? null,
+        correct: topic != null && guess === topic.id,
+      });
+    },
+  );
 
   app.patch<{
     Params: { id: string };

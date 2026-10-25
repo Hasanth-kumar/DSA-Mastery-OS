@@ -81,6 +81,7 @@ export class NotionSyncService {
   }
 
   isConfigured(): boolean {
+    if (this.config.notion.syncEnabled === false) return false;
     const { token, topicsDbId, problemsDbId, sessionsDbId } = this.config.notion;
     return Boolean(token && topicsDbId && problemsDbId && sessionsDbId);
   }
@@ -93,6 +94,7 @@ export class NotionSyncService {
         topicsDbId,
         problemsDbId,
         sessionsDbId,
+        writeEnabled: this.config.notion.writeEnabled,
       });
     }
     return this.notion;

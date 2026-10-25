@@ -15,11 +15,14 @@ const TRUNCATION_WARN_CHARS = 24_000;
 interface Props {
   /** Pre-anchor the chat to a problem (1.2) — set when arriving from Today. */
   anchorProblemId?: string | null;
+  /** P5.2: the anchor came from a hidden-pattern row on Today. */
+  anchorHidePattern?: boolean;
 }
 
 interface CoachRequestOptions {
   problemId?: string;
   includeContext: boolean;
+  hidePattern?: boolean;
   directMode: boolean;
   model?: string;
 }
@@ -112,7 +115,7 @@ function ScrollDownIcon() {
   );
 }
 
-export function CoachingPage({ anchorProblemId }: Props) {
+export function CoachingPage({ anchorProblemId, anchorHidePattern }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [problems, setProblems] = useState<Problem[]>([]);
@@ -169,6 +172,8 @@ export function CoachingPage({ anchorProblemId }: Props) {
   const coachOptions = (): CoachRequestOptions => ({
     problemId: problemId || undefined,
     includeContext,
+    // Only while still anchored to the hidden row itself.
+    hidePattern: anchorHidePattern && problemId !== "" && problemId === anchorProblemId ? true : undefined,
     directMode,
     model: modelId || undefined,
   });

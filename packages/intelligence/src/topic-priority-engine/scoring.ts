@@ -5,6 +5,7 @@ import type {
   TopicState,
 } from "../types.js";
 import { differenceInDays } from "../utils/dates.js";
+import { resolveUrgencyScore } from "./resolve-urgency.js";
 
 export const DEFAULT_WEIGHTS: PriorityWeights = {
   urgency: 0.3,
@@ -14,7 +15,7 @@ export const DEFAULT_WEIGHTS: PriorityWeights = {
   recency: 0.1,
 };
 
-/** SM-2 says not due; execution says struggling. */
+/** Nothing is due (SM-2 date, or no due re-solve under P4.1); execution says struggling. */
 export const DIVERGENCE_URGENCY_MAX = 0.1;
 export const DIVERGENCE_WEAKNESS_MIN = 0.4;
 const DIVERGENCE_SCORE_BOOST = 12;
@@ -29,6 +30,13 @@ export function isMemoryExecutionDivergent(
 }
 
 export function urgencyScore(topic: TopicState, now: Date): number {
+  // P4.1: with topic SM-2 retired, urgency comes from the topic's due re-solves.
+  if (topic.resolveDueAt) {
+    return resolveUrgencyScore(
+      { lastRevised: topic.lastRevised, resolveDueAt: topic.resolveDueAt },
+      now,
+    );
+  }
   if (!topic.lastRevised) return 1.0;
   if (!topic.nextRevisionAt) return 0.8;
   const daysOverdue = differenceInDays(now, topic.nextRevisionAt);

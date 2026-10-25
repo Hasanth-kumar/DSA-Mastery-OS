@@ -27,6 +27,11 @@ export interface NotionSyncConfig {
   cardsDbId?: string;
   /** Inject a client for tests; defaults to a real `@notionhq/client`. */
   client?: NotionClientLike;
+  /**
+   * When false, schema updates and card pushes are logged no-ops.
+   * Pulls stay available. Omit to keep writes enabled.
+   */
+  writeEnabled?: boolean;
 }
 
 /** The minimal slice of `@notionhq/client` this adapter needs (keeps it stubbable). */
@@ -84,8 +89,15 @@ export class NotionSyncTarget implements SyncTarget {
     return Boolean(this.config.token && this.config.cardsDbId);
   }
 
+  private refuseWrite(action: string): boolean {
+    if (this.config.writeEnabled !== false) return false;
+    console.warn(`[notion] write skipped (${action}): NOTION_WRITE_ENABLED=false`);
+    return true;
+  }
+
   /** Add any missing card-DB columns (§8 shape). Best-effort, runs once. */
   async ensureSchema(): Promise<void> {
+    if (this.refuseWrite("ensureSchema")) return;
     if (this.schemaEnsured || !this.isConfigured()) return;
     const dbId = this.config.cardsDbId!;
     const current = await this.queue.add(() =>
@@ -118,6 +130,15 @@ export class NotionSyncTarget implements SyncTarget {
    * card dirty for the next flush — never aborts the batch.
    */
   async pushCards(records: CardSyncRecord[]): Promise<SyncPushResult> {
+    if (this.refuseWrite("pushCards")) {
+      // Leave every card dirty. A no-op must not look like a successful push.
+      return {
+        pushed: 0,
+        failed: records.length,
+        failedIds: records.map((record) => record.id),
+        pageIds: {},
+      };
+    }
     if (records.length === 0 || !this.isConfigured()) {
       return { pushed: 0, failed: 0, pageIds: {} };
     }

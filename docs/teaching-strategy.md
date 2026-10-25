@@ -83,11 +83,22 @@ hints. No new evaluator needed — adaptation **emerges** from this one input.
 The mistake histogram (`topicMistakeTags`) should log two families. Reasoning errors usually
 matter more than syntax for interviews.
 
-- **Coding tags:** `off-by-one`, `empty/single-input`, `loop-invariant`, `wrong-base-case`,
-  `mutate-while-iterating`, `null-deref`.
-- **Reasoning tags:** `missed-sorted` (didn't exploit sorted input), `wrong-complexity` (chose
-  O(n²) when O(n log n) needed), `greedy-vs-dp` (used DP where greedy worked, or vice versa),
-  `missed-invariant`, `wrong-data-structure`, `over-complicated`.
+**The live, closed set** (single source of truth: `MistakeTag` / `MISTAKE_TAGS` in
+`packages/intelligence/src/types.ts`; labels, weakness advice and FocusPlanner checklists are
+typed against it, so a new tag fails the build until every table covers it):
+
+- **Reasoning:** `wrong-approach`, `pattern-recall` (couldn't recall the pattern),
+  `greedy-invariant` (the greedy choice didn't hold). These count as a missing approach when
+  rating a re-solve.
+- **Coding:** `edge-case`, `off-by-one`, `loop-bounds` (loop start, stop or termination).
+
+`could-not-solve` is a system tag for a failed re-solve, not a capture option. Help is captured
+separately as a level (None / Hint / Approach / Full solution), not as a tag.
+
+**Candidates, not in the set yet** (add one only when it keeps coming up in real sessions,
+design-taste §1.3): `empty/single-input`, `wrong-base-case`, `mutate-while-iterating`,
+`null-deref`, `missed-sorted`, `wrong-complexity`, `greedy-vs-dp`, `wrong-data-structure`,
+`over-complicated`.
 
 The coach should lead with the learner's top tag when relevant ("you've hit `missed-sorted`
 ×3 this week — first ask: is the input sorted?").

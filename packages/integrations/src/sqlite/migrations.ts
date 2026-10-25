@@ -20,4 +20,5 @@ export const MIGRATIONS = [
   "0014_cards_front_index.sql",
   "0015_coach_usage.sql",
   "0016_problem_reviews.sql",
+  "0017_attempt_signals.sql",
 ] as const;

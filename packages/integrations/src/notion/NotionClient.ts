@@ -21,6 +21,13 @@ export interface NotionConfig {
   topicsDbId: string;
   problemsDbId: string;
   sessionsDbId: string;
+  /**
+   * When false, every write is a logged no-op and never touches the network.
+   * Omit to keep writes enabled (live default).
+   */
+  writeEnabled?: boolean;
+  /** Test seam. Production constructs the official client. */
+  client?: Client;
 }
 
 type DatabaseQueryFilter = Parameters<Client["databases"]["query"]>[0]["filter"];
@@ -31,8 +38,15 @@ export class NotionClient {
   private readonly propertiesByDb = new Map<string, Record<string, { type?: string }>>();
 
   constructor(private readonly config: NotionConfig) {
-    this.client = new Client({ auth: config.token });
+    this.client = config.client ?? new Client({ auth: config.token });
     this.requestQueue = new PQueue({ intervalCap: 3, interval: 1000 });
+  }
+
+  /** True when this call must not reach Notion. Logs the skip. */
+  private refuseWrite(action: string): boolean {
+    if (this.config.writeEnabled !== false) return false;
+    console.warn(`[notion] write skipped (${action}): NOTION_WRITE_ENABLED=false`);
+    return true;
   }
 
   get databaseIds() {
@@ -52,6 +66,7 @@ export class NotionClient {
    * in Notion (Next Review, SM-2 Interval, Ease Factor).
    */
   async ensureTopicScheduleProperties(): Promise<string[]> {
+    if (this.refuseWrite("ensureTopicScheduleProperties")) return [];
     const dbId = this.config.topicsDbId;
     const schema = await this.getDatabaseProperties(dbId);
     const propertiesToAdd: Record<
@@ -105,6 +120,7 @@ export class NotionClient {
   }
 
   async updateTopic(pageId: string, update: TopicNotionUpdate): Promise<void> {
+    if (this.refuseWrite("updateTopic")) return;
     const schema = await this.getDatabaseProperties(this.config.topicsDbId);
     const properties: Record<string, unknown> = {};
     const statusMap: Record<string, string> = {
@@ -194,6 +210,7 @@ export class NotionClient {
   }
 
   async updateProblem(pageId: string, update: ProblemNotionUpdate): Promise<void> {
+    if (this.refuseWrite("updateProblem")) return;
     const schema = await this.getDatabaseProperties(this.config.problemsDbId);
     const properties: Record<string, unknown> = {};
 
@@ -228,6 +245,7 @@ export class NotionClient {
     databaseId: string,
     session: SessionNotionCreate,
   ): Promise<string> {
+    if (this.refuseWrite("createSession")) return "notion-write-disabled";
     const titleProperty = await this.getTitlePropertyName(databaseId);
     const response = await this.requestQueue.add(async () =>
       this.client.pages.create({
@@ -267,6 +285,7 @@ export class NotionClient {
     difficulty?: string;
     leetcodeLink?: string;
   }): Promise<string> {
+    if (this.refuseWrite("createProblem")) return "notion-write-disabled";
     const dbId = this.config.problemsDbId;
     const titleProperty = await this.getTitlePropertyName(dbId);
     const schema = await this.getDatabaseProperties(dbId);
@@ -306,12 +325,14 @@ export class NotionClient {
   }
 
   async archivePage(pageId: string): Promise<void> {
+    if (this.refuseWrite("archivePage")) return;
     await this.requestQueue.add(() =>
       this.client.pages.update({ page_id: pageId, archived: true }),
     );
   }
 
   async setProblemTopics(pageId: string, topicIds: string[]): Promise<void> {
+    if (this.refuseWrite("setProblemTopics")) return;
     const schema = await this.getDatabaseProperties(this.config.problemsDbId);
     if (schema.Topic?.type !== "relation") return;
 
@@ -328,6 +349,7 @@ export class NotionClient {
 
   /** Append a quick-capture note as a paragraph block at the end of a topic page. */
   async appendTopicNote(pageId: string, text: string): Promise<void> {
+    if (this.refuseWrite("appendTopicNote")) return;
     await this.requestQueue.add(() =>
       this.client.blocks.children.append({
         block_id: pageId,
@@ -386,5 +408,12 @@ export function createNotionClient(
       "Notion is not configured. Set NOTION_TOKEN and all NOTION_*_DB_ID values in .env",
     );
   }
-  return new NotionClient({ token, topicsDbId, problemsDbId, sessionsDbId });
+  return new NotionClient({
+    token,
+    topicsDbId,
+    problemsDbId,
+    sessionsDbId,
+    writeEnabled: config.writeEnabled,
+    client: config.client,
+  });
 }

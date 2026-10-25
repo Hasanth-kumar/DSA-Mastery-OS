@@ -1,5 +1,12 @@
 import {
+  buildTopicProblemCounts,
   createCurriculumEngine,
+  buildHardPrerequisiteEdges,
+  buildTopicGraphEdges,
+  evaluatePinExpiry,
+  PIN_MAX_AGE_DAYS,
+  type PinExpiryReason,
+  type PrimaryTopicSource,
   type CurriculumConfig,
   type CurriculumItem,
   type CurriculumProgress,
@@ -12,6 +19,16 @@ import type { SyncMetaRepository } from "../repositories/SyncMetaRepository.js";
 
 const TOPICS_KEY = "curriculum_topics";
 const ACTIVE_TOPIC_KEY = "curriculum_active_topic_id";
+const PIN_SET_AT_KEY = "curriculum_active_topic_set_at";
+const PIN_LAST_EXPIRY_KEY = "curriculum_pin_last_expiry";
+/** The topic the curriculum is working through (auto; not a manual pin). P3.4. */
+const CURRENT_TOPIC_KEY = "curriculum_current_topic_id";
+
+export interface PinExpiryRecord {
+  topicId: string;
+  reason: PinExpiryReason;
+  at: number;
+}
 
 export interface CurriculumState {
   topicNames: string[];
@@ -25,6 +42,8 @@ export class CurriculumService {
   constructor(
     private readonly syncMetaRepo: SyncMetaRepository,
     private readonly problemRepo: ProblemRepository,
+    /** P7.2: with `curriculumV2`, ranking uses only the approved hard prerequisites. */
+    private readonly flags: { curriculumV2?: boolean } = {},
   ) {}
 
   getTopicNames(): string[] {
@@ -54,15 +73,64 @@ export class CurriculumService {
     return this.syncMetaRepo.get(ACTIVE_TOPIC_KEY);
   }
 
-  setActiveTopicId(topicId: string | null): void {
+  setActiveTopicId(topicId: string | null, now = Date.now()): void {
     if (topicId) {
       this.syncMetaRepo.set(ACTIVE_TOPIC_KEY, topicId);
+      this.syncMetaRepo.set(PIN_SET_AT_KEY, String(now));
     } else {
       this.syncMetaRepo.set(ACTIVE_TOPIC_KEY, "");
+      this.syncMetaRepo.set(PIN_SET_AT_KEY, "");
     }
   }
 
+  /** When the current pin was set, ms; null when unpinned or set before P3.3. */
+  getPinnedAt(): number | null {
+    const raw = this.syncMetaRepo.get(PIN_SET_AT_KEY);
+    const n = raw ? Number(raw) : NaN;
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
+  getLastPinExpiry(): PinExpiryRecord | null {
+    const raw = this.syncMetaRepo.get(PIN_LAST_EXPIRY_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as PinExpiryRecord;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * P3.3: clear the pin once the pinned topic's first pass is complete or
+   * the pin is 7 days old. A pin set before P3.3 has no date; its clock
+   * starts on the first check. Returns the expiry when one happened.
+   */
+  expirePinIfDue(now = Date.now()): PinExpiryRecord | null {
+    const topicId = this.getActiveTopicId();
+    if (!topicId) return null;
+
+    let pinnedAt = this.getPinnedAt();
+    if (pinnedAt == null) {
+      pinnedAt = now;
+      this.syncMetaRepo.set(PIN_SET_AT_KEY, String(now));
+    }
+
+    const decision = evaluatePinExpiry({
+      pinnedAt,
+      counts: this.buildProblemCounts().get(topicId),
+      now,
+    });
+    if (!decision.expired) return null;
+
+    const record: PinExpiryRecord = { topicId, reason: decision.reason, at: now };
+    this.setActiveTopicId(null, now);
+    this.syncMetaRepo.set(PIN_LAST_EXPIRY_KEY, JSON.stringify(record));
+    console.info(`[curriculum] pin on ${topicId} expired: ${decision.reason}`);
+    return record;
+  }
+
   getConfig(): CurriculumConfig {
+    this.expirePinIfDue();
     const active = this.getActiveTopicId();
     return {
       topicNames: this.getTopicNames(),
@@ -70,24 +138,38 @@ export class CurriculumService {
     };
   }
 
+  /** First-pass counts per topic: `Revision needed` counts as covered (P3.1). */
   buildProblemCounts(): Map<string, TopicProblemCounts> {
-    const counts = new Map<string, TopicProblemCounts>();
-    for (const problem of this.problemRepo.findAll()) {
-      if (!problem.topicId) continue;
-      const entry = counts.get(problem.topicId) ?? { total: 0, unsolved: 0 };
-      entry.total += 1;
-      if (problem.status !== "Solved") entry.unsolved += 1;
-      counts.set(problem.topicId, entry);
-    }
-    return counts;
+    return buildTopicProblemCounts(this.problemRepo.findAll());
   }
 
-  selectForTopics(topics: TopicState[]): CurriculumSelection | null {
-    return this.engine.selectCurrentTopic(
+  /**
+   * Primary topic for today (P3.4): a valid pin, else the current topic while
+   * its first pass has work left, else the highest-priority ready topic.
+   * Remembers the auto-chosen topic so the next day continues it.
+   */
+  selectForTopics(
+    topics: TopicState[],
+  ): (CurriculumSelection & { source: PrimaryTopicSource }) | null {
+    const selection = this.engine.selectPrimaryTopic(
       this.getConfig(),
       topics,
       this.buildProblemCounts(),
+      {
+        currentTopicId: this.syncMetaRepo.get(CURRENT_TOPIC_KEY) || null,
+        edges: this.flags.curriculumV2
+          ? buildHardPrerequisiteEdges(topics)
+          : buildTopicGraphEdges(topics),
+      },
     );
+    if (
+      selection &&
+      (selection.source === "current" || selection.source === "ranked" || selection.source === "fallback") &&
+      this.syncMetaRepo.get(CURRENT_TOPIC_KEY) !== selection.topic.id
+    ) {
+      this.syncMetaRepo.set(CURRENT_TOPIC_KEY, selection.topic.id);
+    }
+    return selection;
   }
 
   getState(topics: TopicState[]): CurriculumState {
@@ -104,8 +186,14 @@ export class CurriculumService {
       topicNames: config.topicNames,
       currentIndex: selection.index,
       activeTopicId: config.activeTopicId ?? null,
+      pinExpiresAt: config.activeTopicId ? this.pinExpiresAt() : null,
       items: selection.items,
     };
+  }
+
+  private pinExpiresAt(): number | null {
+    const pinnedAt = this.getPinnedAt();
+    return pinnedAt == null ? null : pinnedAt + PIN_MAX_AGE_DAYS * 86_400_000;
   }
 
   resetToDefault(): string[] {
@@ -114,13 +202,6 @@ export class CurriculumService {
   }
 
   listItems(topics: TopicState[]): CurriculumItem[] {
-    const counts = this.buildProblemCounts();
-    return (
-      this.engine.selectCurrentTopic(this.getConfig(), topics, counts)?.items ??
-      this.engine
-        .selectCurrentTopic({ topicNames: this.getTopicNames() }, topics, counts)
-        ?.items ??
-      []
-    );
+    return this.selectForTopics(topics)?.items ?? [];
   }
 }

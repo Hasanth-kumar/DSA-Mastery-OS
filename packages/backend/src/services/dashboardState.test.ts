@@ -80,6 +80,9 @@ beforeEach(() => {
   testDbPath = join(tmpdir(), `dsa-dashboard-state-${Date.now()}.db`);
   resetConfigCache();
   process.env.SQLITE_PATH = testDbPath;
+  // DSA_DB_PATH wins over SQLITE_PATH and a worktree .env sets it; pin both so
+  // loadConfig() never resolves to data/dev/dsa.dev.db.
+  process.env.DSA_DB_PATH = testDbPath;
   config = loadConfig();
   seedDueTopic(testDbPath);
   ctx = createAppContext(config, { coachLlm: createTestCoachLLM() });
@@ -93,6 +96,7 @@ afterEach(async () => {
     // ignore
   }
   delete process.env.SQLITE_PATH;
+  delete process.env.DSA_DB_PATH;
   resetConfigCache();
 });
 

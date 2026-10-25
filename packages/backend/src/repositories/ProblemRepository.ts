@@ -1,6 +1,6 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { problems } from "@dsa/database/schema";
-import type { TopicDifficulty } from "@dsa/intelligence";
+import { isRemainingFirstPass, type TopicDifficulty } from "@dsa/intelligence";
 import { normalizeProblemStatus, type SqliteDb } from "@dsa/integrations";
 import type { MirrorCache } from "../services/MirrorCache.js";
 
@@ -12,6 +12,12 @@ export interface ProblemUpdate {
   timeTaken?: number | null;
   notes?: string;
   githubUrl?: string;
+}
+
+const DIFFICULTY_RANK: Record<string, number> = { Easy: 0, Medium: 1, Hard: 2 };
+
+function difficultyRank(difficulty: string | null): number {
+  return DIFFICULTY_RANK[difficulty ?? ""] ?? 1;
 }
 
 export class ProblemRepository {
@@ -44,28 +50,26 @@ export class ProblemRepository {
     return this.db.select().from(problems).where(eq(problems.id, id)).get() ?? null;
   }
 
-  findUnsolvedByTopicId(
+  /**
+   * Problems not yet covered in the first pass (P3.1 `isRemainingFirstPass`),
+   * Easy first. Uses the same rule as the curriculum counts, so a topic the
+   * curriculum still serves always has a problem to suggest.
+   */
+  findRemainingFirstPassByTopicId(
     topicId: string,
     options: { difficulties?: TopicDifficulty[]; limit?: number } = {},
   ): ProblemRow[] {
     const { difficulties, limit = 3 } = options;
-    const conditions = [
-      eq(problems.topicId, topicId),
-      eq(problems.status, "Not started"),
-    ];
-    if (difficulties && difficulties.length > 0) {
-      conditions.push(inArray(problems.difficulty, difficulties));
-    }
-
-    return this.db
-      .select()
-      .from(problems)
-      .where(and(...conditions))
-      .orderBy(
-        sql`CASE ${problems.difficulty} WHEN 'Easy' THEN 0 WHEN 'Medium' THEN 1 WHEN 'Hard' THEN 2 ELSE 1 END`,
+    return this.findByTopicId(topicId)
+      .filter((p) => isRemainingFirstPass(p.status))
+      .filter(
+        (p) =>
+          !difficulties ||
+          difficulties.length === 0 ||
+          difficulties.includes(p.difficulty as TopicDifficulty),
       )
-      .limit(limit)
-      .all();
+      .sort((a, b) => difficultyRank(a.difficulty) - difficultyRank(b.difficulty))
+      .slice(0, limit);
   }
 
   /** Solved problems for a topic, oldest update first (most decayed first). */

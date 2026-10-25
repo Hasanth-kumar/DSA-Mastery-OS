@@ -105,14 +105,15 @@ describe("RevisionEngine.applyQuality — continues from persisted state (Phase 
   const engine = new RevisionEngine();
 
   it("reads persisted sm2_* state, not revisionCount/confidence", () => {
-    // revisionCount and confidence are intentionally INCONSISTENT with the
-    // persisted SM-2 state. The engine must trust sm2_* — reconstruction from
-    // revisionCount (0) would give interval 1, proving the bug if it returns 1.
+    // revisionCount is intentionally INCONSISTENT with the persisted SM-2 state.
+    // The engine must trust sm2_* — reconstruction from revisionCount (0) would
+    // give interval 1, proving the bug if it returns 1. Confidence is high here
+    // so the low-confidence interval cap (tested below) does not interfere.
     const topic = persisted({
       id: "t",
       name: "T",
       revisionCount: 0,
-      confidence: 10,
+      confidence: 90,
       sm2Interval: 6,
       sm2Repetition: 2,
       sm2Efactor: 2.5,
@@ -126,6 +127,22 @@ describe("RevisionEngine.applyQuality — continues from persisted state (Phase 
     expect(next.nextRevisionAt.getTime()).toBe(
       addDays(FIXED_NOW, next.interval).getTime(),
     );
+  });
+
+  it("caps the interval for a low-confidence topic even when the stored state would grow it", () => {
+    const topic = persisted({
+      id: "t",
+      name: "T",
+      confidence: 10,
+      sm2Interval: 6,
+      sm2Repetition: 2,
+      sm2Efactor: 2.5,
+    });
+
+    const next = engine.applyQuality(topic, 5, FIXED_NOW);
+
+    expect(next.repetition).toBe(3); // progress is still recorded...
+    expect(next.interval).toBe(7); // ...but a 10%-confidence topic is seen within a week
   });
 
   it("a Forgot grade does not erase the fact that prior reviews happened", () => {

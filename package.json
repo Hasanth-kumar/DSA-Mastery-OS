@@ -18,6 +18,8 @@
     "db:generate-cards": "pnpm --filter @dsa/integrations db:generate-cards",
     "db:suggest-problems": "pnpm --filter @dsa/integrations db:suggest-problems",
     "db:dedupe-problems": "pnpm --filter @dsa/integrations db:dedupe-problems",
+    "db:backfill-resolve-pool": "pnpm --filter @dsa/backend db:backfill-resolve-pool",
+    "db:repair-schedules": "pnpm --filter @dsa/backend db:repair-schedules",
     "prestart": "pnpm build",
     "start": "NODE_ENV=production SERVE_FRONTEND=true node packages/backend/dist/server.js",
     "study": "bash infrastructure/scripts/study.sh",
@@ -25,7 +27,11 @@
     "study:stop": "bash infrastructure/scripts/study-stop.sh",
     "docker:up": "docker compose -f infrastructure/docker-compose.yml up -d",
     "docker:down": "docker compose -f infrastructure/docker-compose.yml down",
-    "setup": "bash infrastructure/scripts/setup.sh"
+    "setup": "bash infrastructure/scripts/setup.sh",
+    "dev:snapshot": "node infrastructure/scripts/dev-db.mjs snapshot",
+    "dev:reset": "node infrastructure/scripts/dev-db.mjs reset",
+    "dev:metrics": "node --disable-warning=ExperimentalWarning infrastructure/scripts/dev-metrics.mjs",
+    "dev:simulate-plan": "pnpm --filter @dsa/backend dev:simulate-plan"
   },
   "engines": {
     "node": ">=20"

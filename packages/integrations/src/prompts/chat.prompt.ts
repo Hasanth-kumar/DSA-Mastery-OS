@@ -28,10 +28,17 @@ function formatLearningContext(ctx: ChatLearningContext): string {
 
   if (ctx.problem) {
     const p = ctx.problem;
-    const lines = [
-      `Anchored problem: ${p.name} (${p.difficulty}) — topic ${p.topicName}, ` +
-        `status ${p.status}, ${p.attempts} attempt(s), topic confidence ${p.confidence}/100.`,
-    ];
+    const lines = p.patternHidden
+      ? [
+          `Anchored problem: ${p.name} (${p.difficulty}), status ${p.status}, ${p.attempts} attempt(s).`,
+          "The student is practising pattern recognition on this problem: they were not told which " +
+            "pattern it uses. Do not name or hint at the pattern, technique or data structure unless " +
+            "they explicitly ask for that rung of the hint ladder.",
+        ]
+      : [
+          `Anchored problem: ${p.name} (${p.difficulty}) — topic ${p.topicName}, ` +
+            `status ${p.status}, ${p.attempts} attempt(s), topic confidence ${p.confidence}/100.`,
+        ];
 
     if (p.solveHistory && p.solveHistory.length > 0) {
       const history = p.solveHistory

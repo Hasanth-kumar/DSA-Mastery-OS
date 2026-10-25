@@ -1,3 +1,5 @@
+import { createOpenRouterClient } from "../llm/OpenRouterClient.js";
+
 /**
  * Batch-generation LLM runtime (design §13, §14).
  *
@@ -108,4 +110,43 @@ export function createGenerationClient(config: FallbackGenerationConfig): Genera
       return null;
     },
   };
+}
+
+export interface BatchGenerationOptions {
+  provider: "openrouter" | "mock" | "disabled";
+  localModel?: string;
+  cloud: {
+    apiKey: string;
+    model: string;
+    baseUrl?: string;
+    siteUrl?: string;
+    siteName?: string;
+  };
+}
+
+/**
+ * Batch card generation honors `LLM_PROVIDER`. `mock` and `disabled` never
+ * call Ollama or OpenRouter.
+ */
+export function createBatchGenerationClient(options: BatchGenerationOptions): GenerationClient {
+  if (options.provider !== "openrouter") {
+    const mock = options.provider === "mock";
+    return {
+      isConfigured: () => mock,
+      async generate(): Promise<string | null> {
+        console.warn(`[llm] generation skipped: LLM_PROVIDER=${options.provider}`);
+        return mock ? "[mock] outbound LLM disabled" : null;
+      },
+    };
+  }
+  return createGenerationClient({
+    local: createOllamaGenerationClient({ model: options.localModel }),
+    cloud: createOpenRouterClient({
+      apiKey: options.cloud.apiKey,
+      model: options.cloud.model,
+      baseUrl: options.cloud.baseUrl,
+      siteUrl: options.cloud.siteUrl,
+      siteName: options.cloud.siteName,
+    }),
+  });
 }

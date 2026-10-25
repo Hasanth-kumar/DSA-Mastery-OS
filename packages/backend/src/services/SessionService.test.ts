@@ -9,7 +9,7 @@ import {
   runMigrations,
   type LLMClient,
 } from "@dsa/integrations";
-import { loadConfig, resetConfigCache } from "@dsa/shared";
+import { FEATURE_FLAGS_OFF, loadConfig, resetConfigCache } from "@dsa/shared";
 import type { AppConfig } from "@dsa/shared";
 import { createAppContext, type AppContext } from "../context.js";
 
@@ -75,7 +75,12 @@ beforeEach(() => {
   testDbPath = join(tmpdir(), `dsa-session-srs-${Date.now()}.db`);
   resetConfigCache();
   process.env.SQLITE_PATH = testDbPath;
-  config = loadConfig();
+  // DSA_DB_PATH wins over SQLITE_PATH and a worktree .env sets it; pin both so
+  // loadConfig() never resolves to data/dev/dsa.dev.db.
+  process.env.DSA_DB_PATH = testDbPath;
+  // These cases pin the SM-2 (flag-off) behavior; the worktree .env turns the
+  // overhaul flags on, so pin them off. Flag-on cases: fsrs-topic-signals.test.ts.
+  config = { ...loadConfig(), flags: { ...FEATURE_FLAGS_OFF } };
   seedTopic(testDbPath, Date.now() - 2 * MS_PER_DAY);
   ctx = createAppContext(config, { coachLlm: createTestCoachLLM() });
 });
@@ -88,6 +93,7 @@ afterEach(async () => {
     // ignore
   }
   delete process.env.SQLITE_PATH;
+  delete process.env.DSA_DB_PATH;
   resetConfigCache();
 });
 

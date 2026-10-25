@@ -33,15 +33,17 @@ export class CardBankSyncService {
     config: AppConfig,
     meta: { get(key: string): string | null; set(key: string, value: string): void },
   ) {
-    const db = sqlite;
-    const target =
-      config.notion.token && config.notion.cardsDbId
-        ? createNotionSyncTarget({
-            token: config.notion.token,
-            cardsDbId: config.notion.cardsDbId,
-          })
-        : createJsonFileSyncTarget({ dir: config.cards.exportDir });
-    this.sync = new CardSyncService(db, target);
+    const notionReady =
+      config.notion.syncEnabled !== false &&
+      Boolean(config.notion.token && config.notion.cardsDbId);
+    const target = notionReady
+      ? createNotionSyncTarget({
+          token: config.notion.token,
+          cardsDbId: config.notion.cardsDbId,
+          writeEnabled: config.notion.writeEnabled,
+        })
+      : createJsonFileSyncTarget({ dir: config.cards.exportDir });
+    this.sync = new CardSyncService(sqlite, target);
     this.meta = meta;
   }
 

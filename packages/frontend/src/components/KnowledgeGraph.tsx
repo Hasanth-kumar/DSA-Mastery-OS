@@ -1,4 +1,4 @@
-import { buildTopicGraphEdges } from "@dsa/intelligence";
+import { buildHardPrerequisiteEdges, buildTopicGraphEdges } from "@dsa/intelligence";
 import { drag as d3drag } from "d3-drag";
 import { easeCubicOut } from "d3-ease";
 import {
@@ -37,6 +37,8 @@ interface Props {
   selectedId?: string | null;
   /** Node click → side panel with stats and "study this now" (5.4). */
   onNodeClick?: (topicId: string) => void;
+  /** P7.2 (`curriculumV2`): draw only the approved hard prerequisites. */
+  hardPrerequisitesOnly?: boolean;
 }
 
 /* CSS variables so the graph follows the active theme. */
@@ -58,7 +60,7 @@ function nodeRadius(node: GraphNode): number {
   return 8 + (node.confidence / 100) * 10;
 }
 
-export function KnowledgeGraph({ topics, selectedId, onNodeClick }: Props) {
+export function KnowledgeGraph({ topics, selectedId, onNodeClick, hardPrerequisitesOnly }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const ref = useRef<SVGSVGElement>(null);
   const fitRef = useRef<(() => void) | null>(null);
@@ -106,7 +108,10 @@ export function KnowledgeGraph({ topics, selectedId, onNodeClick }: Props) {
       (adjacency.get(a) ?? adjacency.set(a, new Set()).get(a)!).add(b);
     };
 
-    for (const { from, to } of buildTopicGraphEdges(topics)) {
+    const edges = hardPrerequisitesOnly
+      ? buildHardPrerequisiteEdges(topics)
+      : buildTopicGraphEdges(topics);
+    for (const { from, to } of edges) {
       if (nodeIds.has(from) && nodeIds.has(to)) {
         links.push({ source: from, target: to } as GraphLink);
         connect(from, to);
@@ -373,7 +378,7 @@ export function KnowledgeGraph({ topics, selectedId, onNodeClick }: Props) {
       fitRef.current = null;
       applyHighlightRef.current = () => {};
     };
-  }, [topics]);
+  }, [topics, hardPrerequisitesOnly]);
 
   // React to selection changes without rebuilding the simulation.
   useEffect(() => {

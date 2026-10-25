@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LLMChatMessage, LLMClient } from "./LLMClient.js";
-import { LLMService, type ChatHistoryMessage } from "./LLMService.js";
+import { createLLMService, LLMService, type ChatHistoryMessage } from "./LLMService.js";
 
 function stubClient(overrides: Partial<LLMClient> = {}): LLMClient & { calls: LLMChatMessage[][] } {
   const calls: LLMChatMessage[][] = [];
@@ -105,5 +105,20 @@ describe("LLMService.generateChatReply error surfacing (A3/A4)", () => {
     await expect(service.generateChatReply(null, [], "hi")).rejects.toThrow(
       "Coach is temporarily unavailable (All models failed (tried: a, b): boom). Please try again.",
     );
+  });
+});
+
+describe("LLM provider mock", () => {
+  it("answers locally and never calls fetch", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const service = createLLMService({
+      provider: "mock",
+      model: "mock-model",
+      openrouter: { apiKey: "should-not-be-used" },
+    });
+    const text = await service.generateChatReply(null, [], "hello");
+    expect(text).toBe("[mock] outbound LLM disabled");
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });

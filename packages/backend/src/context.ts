@@ -89,7 +89,9 @@ export function createAppContext(
   runMigrations(config.sqlite.path);
   const { db, sqlite } = createSqliteDb(config.sqlite.path);
 
-  const mirrorCache = new MirrorCache(db);
+  const mirrorCache = new MirrorCache(db, undefined, {
+    resolveUrgency: config.flags.hideTopicRevision,
+  });
   const topicRepo = new TopicRepository(db, mirrorCache);
   const problemRepo = new ProblemRepository(db, mirrorCache);
   const sessionRepo = new SessionRepository(db, mirrorCache);
@@ -112,7 +114,9 @@ export function createAppContext(
   const obsidianNotes = new ObsidianNoteService(config, noteRepo, problemRepo, topicRepo, () =>
     events.publish("note"),
   );
-  const curriculumService = new CurriculumService(syncMetaRepo, problemRepo);
+  const curriculumService = new CurriculumService(syncMetaRepo, problemRepo, {
+    curriculumV2: config.flags.curriculumV2,
+  });
   const problemReviewRepo = new ProblemReviewRepository(db);
   const problemReviewService = new ProblemReviewService(
     config,
@@ -121,6 +125,7 @@ export function createAppContext(
     problemRepo,
     attemptRepo,
     events,
+    syncMetaRepo,
   );
   const planService = new PlanService(
     intelligence,
@@ -129,6 +134,15 @@ export function createAppContext(
     cache,
     curriculumService,
     problemReviewService,
+    sessionRepo,
+    config.schedulers.timezone,
+    {
+      hideTopicRevision: config.flags.hideTopicRevision,
+      todayQueueV2: config.flags.todayQueueV2,
+      curriculumV2: config.flags.curriculumV2,
+      spiralPasses: config.flags.spiralPasses,
+    },
+    { attemptRepo, problemReviewRepo },
   );
   const coachUsage = new Map<string, number>();
   const sessionService = new SessionService(
@@ -156,7 +170,9 @@ export function createAppContext(
       event.type === "session" ||
       event.type === "topic" ||
       event.type === "problem" ||
-      event.type === "attempt"
+      event.type === "attempt" ||
+      // P5.1 (P1.3): a skipped or admitted re-solve leaves Today at once.
+      (event.type === "resolve" && config.flags.todayQueueV2)
     ) {
       analyticsService.invalidateDashboard();
       void planService.invalidateTodaysPlan();

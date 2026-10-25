@@ -3307,3 +3307,116 @@ button.settings-row {
     transition: none !important;
   }
 }
+
+/* Today focus plan */
+.focus-plan {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  margin-bottom: 20px;
+}
+.focus-plan--reentry { border-color: var(--accent-ring); background: var(--accent-soft); }
+.focus-plan-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.focus-plan-title { margin: 0 0 4px; font-size: 1.15rem; }
+.focus-plan-reason { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+.focus-plan-blocks { list-style: none; margin: 16px 0 0; padding: 0; display: grid; gap: 12px; }
+.focus-plan-block { display: flex; gap: 14px; }
+.focus-plan-min { min-width: 40px; color: var(--accent-ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+.focus-plan-block-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+.focus-plan-block-title a { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+.focus-plan-kind { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-subtle); }
+.focus-plan-diff { font-size: 0.75rem; color: var(--text-muted); }
+.focus-plan-instruction { margin: 2px 0 0; color: var(--text-muted); font-size: 0.85rem; }
+.focus-plan-week { display: flex; align-items: center; gap: 12px; margin-top: 18px; }
+.focus-plan-week-bar { flex: 1; height: 6px; border-radius: 999px; background: var(--ghost); overflow: hidden; }
+.focus-plan-week-bar span { display: block; height: 100%; background: var(--accent); }
+.focus-plan-week-label { font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
+.focus-plan-tip { margin: 12px 0 0; font-size: 0.85rem; color: var(--text-muted); }
+@media (max-width: 600px) { .focus-plan-week { flex-direction: column; align-items: stretch; } }
+
+.focus-plan-tip ul { margin: 6px 0 0; padding-left: 18px; }
+.focus-plan-tip strong { color: var(--text); font-weight: 600; }
+
+/* P4.3: Today with no right column (topic Revision hidden, Up next hidden). */
+.today-grid.today-grid--single {
+  grid-template-columns: 1fr;
+}
+
+.today-grid--single .today-grid-col--left {
+  padding-right: 0;
+  border-right: none;
+  border-bottom: none;
+}
+
+/* One problem at a time: rows locked while another problem's timer runs. */
+.problem-row-v2--locked {
+  opacity: 0.45;
+}
+
+.problem-row-v2--locked button:disabled {
+  cursor: not-allowed;
+}
+
+/* P5.2: the re-solve row in the Today queue — a mono kicker and its reason. */
+.problem-row-kicker {
+  padding-left: 80px;
+  margin-bottom: 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.problem-row-reason {
+  padding-left: 80px;
+  margin: 6px 0 12px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* P5.3: the decision line under the hero reason. */
+.focus-hero-decision {
+  margin: -16px 0 24px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-subtle);
+}
+
+/* P6.1 / P6.2: MistakeCapture rows, the pattern reveal and the takeaway line. */
+.mistake-capture-row-label {
+  margin-top: 14px;
+}
+
+.mistake-capture-reveal {
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-soft);
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.mistake-capture-takeaway {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 0.88rem;
+}
+
+.mistake-capture-takeaway:focus {
+  outline: none;
+  border-color: var(--accent-ring);
+}
+
+/* P6.2: the last takeaway on a re-solve row, in the reason's voice. */
+.problem-row-takeaway {
+  margin-top: -6px;
+  font-style: italic;
+}

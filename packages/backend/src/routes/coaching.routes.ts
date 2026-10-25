@@ -160,6 +160,7 @@ export async function coachingRoutes(
       message?: string;
       problemId?: string;
       includeContext?: boolean;
+      hidePattern?: boolean;
       directMode?: boolean;
       model?: string;
     };
@@ -176,6 +177,7 @@ export async function coachingRoutes(
         message,
         problemId: request.body.problemId,
         includeContext: request.body.includeContext ?? true,
+        hidePattern: request.body.hidePattern,
         directMode: request.body.directMode ?? false,
         model: request.body.model,
       });
@@ -193,6 +195,7 @@ export async function coachingRoutes(
       message?: string;
       problemId?: string;
       includeContext?: boolean;
+      hidePattern?: boolean;
       directMode?: boolean;
       model?: string;
     };
@@ -210,6 +213,7 @@ export async function coachingRoutes(
           message,
           problemId: request.body.problemId,
           includeContext: request.body.includeContext ?? true,
+          hidePattern: request.body.hidePattern,
           directMode: request.body.directMode ?? false,
           model: request.body.model,
         },
@@ -223,6 +227,7 @@ export async function coachingRoutes(
       threadId?: string;
       problemId?: string;
       includeContext?: boolean;
+      hidePattern?: boolean;
       directMode?: boolean;
       model?: string;
     };
@@ -238,6 +243,7 @@ export async function coachingRoutes(
           threadId,
           problemId: request.body.problemId,
           includeContext: request.body.includeContext ?? true,
+          hidePattern: request.body.hidePattern,
           directMode: request.body.directMode ?? false,
           model: request.body.model,
         },
@@ -253,6 +259,7 @@ export async function coachingRoutes(
       content?: string;
       problemId?: string;
       includeContext?: boolean;
+      hidePattern?: boolean;
       directMode?: boolean;
       model?: string;
     };
@@ -274,6 +281,7 @@ export async function coachingRoutes(
           content,
           problemId: request.body.problemId,
           includeContext: request.body.includeContext ?? true,
+          hidePattern: request.body.hidePattern,
           directMode: request.body.directMode ?? false,
           model: request.body.model,
         },

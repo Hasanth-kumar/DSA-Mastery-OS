@@ -44,15 +44,17 @@ export function useNavMeta(activeTab: string, coachAnchorId: string | null): Nav
   const fetchSync = useCallback(() => api.getSyncStatus(), []);
   const { data: sync } = usePolling(fetchSync, NAV_POLL_MS, { initialLoading: false });
 
+  // P7.5: a mixed day names no pattern anywhere, the nav included (§6.4).
+  const mixedDay = plan?.queue?.dayKind === "mixed";
+  const todayLabel = mixedDay ? "Mixed practice" : (plan?.primaryTopic.name ?? null);
   const coachContext =
     coachAnchorId && plan
-      ? (plan.suggestedProblems.find((p) => p.problemId === coachAnchorId)?.name ??
-        plan.primaryTopic.name)
-      : plan?.primaryTopic.name ?? null;
+      ? (plan.suggestedProblems.find((p) => p.problemId === coachAnchorId)?.name ?? todayLabel)
+      : todayLabel;
 
   return {
-    todayTopic: plan?.primaryTopic.name ?? null,
-    todayDuration: plan?.estimatedDuration ?? null,
+    todayTopic: todayLabel,
+    todayDuration: plan?.queue ? plan.queue.totalMinutes : (plan?.estimatedDuration ?? null),
     coachContext: activeTab === "coach" ? coachContext : null,
     reviewDue: reviewDue ?? null,
     resolveDue: resolveDue ?? null,

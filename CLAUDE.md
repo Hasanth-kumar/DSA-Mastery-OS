@@ -8,6 +8,16 @@ DSA Mastery OS is a single-learner study system (no accounts, no multi-tenancy b
 
 The **flashcard bank** is a first-class subsystem: seeded baseline cards, per-card FSRS scheduling, batch LLM generation from notes, local embeddings for dedup, and a separate Review tab. Warm-up reads due cards locally with zero LLM calls. See `docs/flashcard-system-design.md` for the full spec.
 
+## Design taste is binding — read it first
+
+Before changing anything in this repo, read `docs/design-taste-and-preferences.md` in full. It is the canonical source for the visual aesthetic ("Atelier Editorial"), interaction patterns, pedagogical guardrails, and architectural house style, and it applies to every feature, fix and refactor.
+
+- Frontend work: re-read its §2 (visual aesthetic) and §3 (UX principles) first. Reuse existing tokens, type voices and components; don't introduce new colors, fonts, shadows, boxed card grids or pills.
+- Engine, service and backend work: re-read its §4 (architecture house style) first.
+- If a request conflicts with the design doc, follow the doc and say so.
+
+Agents working on the system overhaul also follow `docs/plans/system-overhaul-plan.md`. `AGENTS.md` carries the same instructions for non-Claude agents.
+
 ## Commands
 
 ```bash
@@ -22,6 +32,10 @@ pnpm dev:all          # API (:3000) + dashboard (:5173) in parallel
 pnpm build            # build all packages (see ordering note below)
 pnpm test             # all Vitest suites
 pnpm lint             # ESLint across packages
+
+pnpm dev:snapshot     # copy data/dev/dsa.dev.db to data/dev/snapshots/<timestamp>.db
+pnpm dev:reset        # restore data/dev/dsa.dev.db from the pristine baseline
+pnpm dev:simulate-plan --days 14  # old curriculum vs two-loop selector, day by day, on a copy of the dev DB
 
 pnpm db:seed          # Notion -> SQLite initial sync (topics/problems/sessions)
 pnpm db:seed-cards    # load seed flashcards from database/seeds

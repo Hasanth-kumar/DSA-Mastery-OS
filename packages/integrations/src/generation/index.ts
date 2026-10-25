@@ -33,6 +33,7 @@ export {
 export {
   createOllamaGenerationClient,
   createGenerationClient,
+  createBatchGenerationClient,
   DEFAULT_OLLAMA_GEN_MODEL,
   type GenerationClient,
   type OllamaGenerationConfig,

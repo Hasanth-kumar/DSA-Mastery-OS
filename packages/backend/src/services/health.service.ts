@@ -77,9 +77,14 @@ async function buildHealth(ctx: AppContext, deep: boolean): Promise<HealthRespon
         ctx.notionSync.isConfigured()
           ? { status: "ok" as const, message: "not probed (use /health/ready)" }
           : { status: "down" as const, message: "Not configured" },
-        ctx.config.llm.openrouter.apiKey
-          ? { status: "ok" as const, message: "not probed (use /health/ready)" }
-          : { status: "down" as const, message: "OPENROUTER_API_KEY not set" },
+        ctx.config.llm.provider !== "openrouter"
+          ? {
+              status: "ok" as const,
+              message: `LLM provider ${ctx.config.llm.provider} (no outbound calls)`,
+            }
+          : ctx.config.llm.openrouter.apiKey
+            ? { status: "ok" as const, message: "not probed (use /health/ready)" }
+            : { status: "down" as const, message: "OPENROUTER_API_KEY not set" },
       ];
 
   const services = { api, sqlite, notion, llm };
@@ -120,6 +125,12 @@ async function checkNotion(ctx: AppContext): Promise<ServiceHealth> {
 }
 
 async function checkLlmHealth(config: AppConfig): Promise<ServiceHealth> {
+  if (config.llm.provider !== "openrouter") {
+    return {
+      status: config.llm.provider === "mock" ? "ok" : "down",
+      message: `LLM provider ${config.llm.provider} (no outbound calls)`,
+    };
+  }
   const apiKey = config.llm.openrouter.apiKey;
   if (!apiKey) {
     return { status: "down", message: "OPENROUTER_API_KEY not set" };
