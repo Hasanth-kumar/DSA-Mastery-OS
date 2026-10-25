@@ -35,9 +35,14 @@
 | P7.5 | done | bb84c82 | two-loop queue behind `curriculumV2` + `spiralPasses` (+ `todayQueueV2`); `pnpm dev:simulate-plan` |
 | P8.1 | done | fcdebbd | `live-migration-steps.md`: 10 sections, flags in 3 groups, queries checked on a dev copy |
 | P8.2 | done | 6421064 | runbook dry-run on a 2026-10-25 live copy; D14 found and fixed |
-| P8.3 | todo | | |
+| P8.3 | done | 5a42dff | `merge-pr-description.md`; ready for Santosh to open the PR and merge |
 
 ## Log
+### 2026-10-25 — P8.3 Merge PR description
+- Did: `docs/plans/merge-pr-description.md`: title, base/compare, "Create a merge commit" (so `git revert -m 1` undoes it), summary, what's in it by phase, what lands with every flag off, the three flag groups, live data changes, how it was verified, known gaps (collected from every task's Known limits and the Ideas list), reviewer checklist, and the PR attribution lines. Test count measured, not estimated: `main` at `f60c5dc` runs 373 tests (shared 2, intelligence 86, integrations 191, backend 94), `overhaul` 661.
+- Tests: docs only; none run.
+- **The overhaul plan is complete.** Remaining: Santosh opens the PR (`overhaul` → `main`, body from the file), merges with a merge commit, and follows `live-migration-steps.md`.
+
 ### 2026-10-25 — P8.2 Dry-run the runbook on a fresh copy of the live DB
 - Santosh asked to do P8.2 and wrap up Phase 8, and allowed reading the live DB. Copied `~/Desktop/dsa-mastery-os/data/sqlite/dsa.db` (app stopped, no WAL; checksum `fb2855f6…`) into a Linux build copy of `overhaul`, with an `.env` holding no tokens: dev path, Notion sync and writes off, WhatsApp off, mock LLM, schedulers off.
 - Ran every runbook step on the copy:
