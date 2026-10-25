@@ -30,7 +30,7 @@
 | P6.4 | dropped | | D6: not built |
 | P7.1 | done | 5619e0e | `topic-tiers.md` approved with changes [D13] |
 | P7.2 | done | 09bb9fb | `topic-prerequisites.ts`: 30 approved edges, doc-checked; curriculum + graph behind `curriculumV2` |
-| P7.3 | todo | | |
+| P7.3 | done | 198ff73 | `topic-pass.ts`: passes 0–3 + evidence; 41 tests; dev DB: 6 topics at pass 1, none at 2 |
 | P7.4 | todo | | |
 | P7.5 | todo | | |
 | P8.1 | todo | | |
@@ -38,6 +38,21 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-25 — P7.3 Pass tracking per topic
+- Did: pure `topicPass(topic, attempts, reviews, now)` in `intelligence/src/curriculum-engine/topic-pass.ts`, plus `isCleanAttempt`. Returns `pass` 0–3, `touched` (introduced but below pass 1, for P7.4's 3-open cap), and per-pass detail: pass 1 counts, uncovered candidates and the day it was reached; pass 2 problems still waiting for a clean re-solve, transfer needed / done; pass 3 hidden correct-and-clean count and overdue re-solves. `evidence` keeps performance and amount apart (§6.3): attempts, clean rate, cold attempts (hidden-pattern attempts plus repeats on a later day) and how many of those were clean. Not in the package barrel yet: nothing outside `@dsa/intelligence` uses it until P7.5 (ADR 0002 B). No flag needed; nothing calls it yet.
+- How the rules read (for review):
+  - **Clean** = no missing-approach tag (`APPROACH_MISTAKE_TAGS`: wrong-approach, pattern-recall, greedy-invariant), not `could-not-solve`, help ≤ Hint. The plan says "no wrong-approach"; I used the code's existing missing-approach set, the same one the re-solve rating uses, so a "Couldn't recall pattern" or "Wrong greedy choice" solve isn't clean either. One line to narrow if Santosh disagrees. Legacy rows with no help level count `used_coach` or in-app hints as Approach help (same as the rating rule).
+  - **Later session** = a later calendar day (learner timezone). 12 of 51 dev-DB attempts have no session id, and one problem has a could-not-solve and a clean solve 15 minutes apart, which shouldn't count as spaced.
+  - **Transfer problems** for pass 2 are Easy/Medium problems still unseen at the end of the day pass 1 was reached (a problem first tried that same day isn't a cold transfer). Hards never count for it.
+  - **Small topics** (< 4 problems) need every problem for pass 1, Hards included: D3 says so explicitly, which wins over "Hards never required for passes 1–2" for these topics (e.g. Heap, 2 Hard).
+  - **"Revision needed" with no attempt rows** (4 imported problems) counts as covered and waits for a clean solve for pass 2.
+  - **Pass 3**: a hidden Hard counts toward the 2 hidden solves; solving Hards is not otherwise required. Overdue = at least 1 day past due, retired and suspended re-solves excluded.
+  - A topic with 4+ problems and no Easy or Medium (none in the dev DB) reaches pass 1 on its first covered problem rather than vacuously.
+  - The level is current state, so it can drop (a later attempt with help reopens pass 2; an overdue re-solve removes pass 3).
+- Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (shared 23, intelligence 251, integrations 200, backend 156). `topic-pass.test.ts` (41): clean matrix (11); pass 0/1 boundaries incl. a 2-problem all-Hard topic, 3 vs 4 problems, no-Easy topic, all-Hard topic, reached-on day; pass 2 incl. same-day vs later-day re-solve, help on a first try, transfer on the pass-1 day, hint vs pattern-recall, reopening, legacy coach flag, imported Revision needed, every remaining problem Hard, Hards not counted as transfer, two transfers needed; pass 3 incl. wrong guess / unsure / help, hidden Hard, overdue vs due today / retired / suspended, pass 2 first; evidence. Mutation checks (9): same-day re-solve counting, pass-1-day transfer, ignoring overdue, clean = wrong-approach only, no small-topic rule, hint not clean, vacuous all-Hard pass, ignoring imported Revision needed, any guess counting. Each fails at least one test; restored.
+- Data check (read-only copy of the dev DB, not yet migrated to 0017, so every attempt is a legacy row): 50 topics, 10 touched. By pass: 44 / 6 / 0 / 0. At pass 1: BFS, Binary Search + Prefix Sum, Fast & Slow Pointers, Greedy Sorting, Recursion & Backtracking, Two Pointers. Touched but below pass 1: Bit Manipulation, Hashing + Set/Map, Sliding Window, Sorting + Two Pointers. Nothing reaches pass 2: each pass-1 topic has 4–6 problems that used help with no clean re-solve on a later day since (clean rates 0–33%). Two topics (Greedy Sorting, Two Pointers) have 1 overdue re-solve each.
+- Next suggested task: P7.4.
+
 ### 2026-10-25 — P7.2 Promote prerequisites to a shared DAG
 - Did: `intelligence/src/roadmap-engine/topic-prerequisites.ts` holds the 30 approved hard prerequisites (`topic-tiers.md` §4) by exact topic name, generated from the same data as the doc, plus `BASIC_TOPICS`, `CORE_TOPIC_ORDER`, `LATER_TOPIC_ORDER` for P7.4. `buildHardPrerequisiteEdges` matches by exact name with punctuation folded (curly vs straight apostrophes), no aliases or partial matches ("Binary Search Tree" never matches "Binary Search"). With `curriculumV2` on, `CurriculumService` ranks with these edges only and the Knowledge Graph draws only these; flag off keeps `buildTopicGraphEdges` (Notion prerequisites + roadmap + visual links). `graph-edges.ts` is left in place for the flag-off path; delete after merge.
 - Tests: `pnpm build` ✅ `pnpm lint` ✅ `pnpm test` ✅ (shared 23, intelligence 210, integrations 200, backend 156). `topic-prerequisites.test.ts` (6): the list equals the doc's §4 table (parsed from the markdown, so doc and code can't drift), acyclic (and the checker catches a planted cycle), all 50 topics once, prerequisites earlier in the order or basic, exact-name matching, per-topic lookup. `hard-prerequisites.test.ts` (2): the old links make Union-Find wait for DFS; the approved list doesn't.
