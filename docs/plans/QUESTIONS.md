@@ -1,5 +1,6 @@
 # Questions for Santosh
 ## Open
+- [D13] Approve `docs/plans/topic-tiers.md` (P7.1): the introduction order (11 basics, 21 core, 18 later), the 30 hard prerequisites, and its four decisions (basics count as satisfied prerequisites; Top-K is the heap entry point; core size; DP order). P7.2–P7.5 wait on it. Asked 2026-10-25. Runs waiting: 0
 - [D9] Allow Notion reads in the worktree — default no; use dev DB only. Asked 2026-10-19. Runs waiting: 0
 ## Answered
 - [D4] → No fixed count. Pass 2 = every problem that needed help re-solved clean in a later session, plus up to 2 unseen problems solved clean first try. Answered 2026-10-25 with the learning model in plan §6; rules in P7.3.

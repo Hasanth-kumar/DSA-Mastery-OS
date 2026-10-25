@@ -28,7 +28,7 @@
 | P6.2 | done | df06b1d | takeaway on attempt, appended to existing note, shown on re-solve |
 | P6.3 | done | df06b1d | `MistakeTag` single source; +greedy-invariant, +loop-bounds |
 | P6.4 | dropped | | D6: not built |
-| P7.1 | todo | | |
+| P7.1 | waiting | | `topic-tiers.md` drafted; awaiting approval [D13] |
 | P7.2 | todo | | |
 | P7.3 | todo | | |
 | P7.4 | todo | | |
@@ -38,6 +38,11 @@
 | P8.3 | todo | | |
 
 ## Log
+### 2026-10-25 — P7.1 Introduction order and hard prerequisites (draft)
+- Did: `docs/plans/topic-tiers.md`, generated from the 50 dev-DB topics with problem counts and the D3 pass-1 size of each. Three groups: **Basics** (11 started or familiar patterns: no intro block, outside the 3-open cap, count as satisfied prerequisites), **Core** (21, in exposure-loop order: Greedy Sorting, DP 1D, DFS, Prefix Sum, Stack + String, Monotonic Stack, Top-K, DP on Subsequences, …; 86 problems to pass 1), **Later** (18: advanced, rare, or too few problems). 30 hard prerequisites, checked by script: all 50 names match the DB exactly, each appears once, and every prerequisite comes earlier in the order or is a basic. Section 5 lists where it differs from `graph-edges.ts`.
+- Found while drafting: if basics had to reach pass 1 before counting as prerequisites, the 11 of them would fill P7.4's 3-open cap and nothing new could be introduced; and "Heap (Priority Queue)" is 2 Hard problems only, so as a prerequisite it would block Top-K, Greedy with Heap and Dijkstra. Both are decisions in the doc (§6).
+- Next: Santosh approves or edits [D13]; then P7.2.
+
 ### 2026-10-25 — Phase 6: help level, pattern guess, takeaway, one mistake vocabulary (P6.1–P6.3)
 - Santosh asked to continue with Phase 6.
 - **P6.3**: the closed mistake vocabulary is `MistakeTag` / `MISTAKE_TAGS` in `@dsa/intelligence` types. Added `greedy-invariant` ("Wrong greedy choice"; counts as a missing approach when rating) and `loop-bounds` ("Loop bounds / termination"; a detail slip). Labels, weakness advice and FocusPlanner checklists are now `Record<MistakeTag, …>`, so a new tag fails the build until every table covers it; the rating rule reads `APPROACH_MISTAKE_TAGS`. Teaching strategy §6 now lists the live set and moves the rest to "candidates". **Plan corrected**: P6.3 said `concepts.yaml`, but that is the per-pattern flashcard vocabulary, not the mistake tags.
