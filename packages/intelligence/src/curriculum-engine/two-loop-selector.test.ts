@@ -24,8 +24,11 @@ const NAMES = {
   prefix: "Prefix Sum / Difference Array",
   grids: "DP on Grids",
   seg: "Segment Tree / Fenwick Tree",
+  bs: "Binary Search",
+  bsg: "Binary Search + Greedy",
 } as const;
 type Key = keyof typeof NAMES;
+const BASE_KEYS: Key[] = ["tp", "sw", "hash", "rec", "greedy", "dp", "dfs", "prefix", "grids", "seg"];
 
 /** Basics tp, sw, hash, rec; core greedy → dp → dfs → prefix; later seg. Real hard prerequisites. */
 const CONFIG: TwoLoopConfig = {
@@ -54,7 +57,7 @@ class World {
   pin: string | null = null;
   private minute = 0;
 
-  constructor(keys: Key[] = Object.keys(NAMES) as Key[]) {
+  constructor(keys: Key[] = BASE_KEYS) {
     this.topics = keys.map((k) => ({
       id: k,
       name: NAMES[k],
@@ -190,6 +193,57 @@ describe("two-loop selector — a block runs to completion, then mixed days", ()
     const today = w.day(1);
     expect(today.openTopicIds).not.toContain("dfs");
     expect(today.blockTopicId).toBe("dp");
+  });
+});
+
+describe("two-loop selector — patterns started long ago (D14, P8.2)", () => {
+  it("a block untouched for 14+ days is interrupted: DP starts, the old pattern joins mixed days", () => {
+    // DFS: 2 of its 4 block problems, a month ago. DP untouched. Cap full with basics.
+    const w = startingWorld();
+    w.solve("dfs-e1", 0).solve("dfs-e2", 0);
+    const now = 30;
+    const today = w.day(now);
+    expect(today).toMatchObject({ phase: "block", blockTopicId: "dp" });
+    // Within 14 days it would still be the running block.
+    expect(w.day(10).blockTopicId).toBe("dfs");
+    // Once DP's block is done, the interrupted DFS shows up on mixed days, hidden.
+    for (const s of ["e1", "e2", "m1", "m2"]) w.solve(`dp-${s}`, now);
+    const mixed = w.day(now + 1);
+    expect(mixed.dayKind).toBe("mixed");
+    expect(mixed.picks.map((p) => p.topicId)).toContain("dfs");
+    expectNoPatternNamed(mixed);
+    // Practising it again on a mixed day doesn't revive the block.
+    const dfsPick = mixed.picks.find((p) => p.topicId === "dfs")!;
+    w.solve(dfsPick.problemId, now + 1);
+    expect(w.day(now + 2).blockTopicId).not.toBe("dfs");
+  });
+
+  const bsgConfig = {
+    ...CONFIG,
+    basicTopics: [...CONFIG.basicTopics, NAMES.bs],
+    coreOrder: [NAMES.greedy, NAMES.dp, NAMES.bsg],
+  };
+  /** DP already at pass 1, so it doesn't take the slots. */
+  const bsgWorld = () =>
+    new World(["tp", "sw", "hash", "rec", "greedy", "dp", "bs", "bsg"]).pass1("greedy").pass1("rec").pass1("dp", 1);
+
+  it("a recent block waits while a hard prerequisite is below pass 1 (D13 decision 1)", () => {
+    const w = bsgWorld();
+    w.solve("bsg-e1", 28);
+    expect(w.day(30, bsgConfig).blockTopicId).not.toBe("bsg");
+    expect(w.day(30, bsgConfig).picks.map((p) => p.topicId)).not.toContain("bsg");
+    w.pass1("bs", 30);
+    expect(w.day(31, bsgConfig).blockTopicId).toBe("bsg");
+  });
+
+  it("an interrupted pattern also waits for its prerequisite before joining mixed days", () => {
+    const w = bsgWorld();
+    w.solve("bsg-e1", 0);
+    expect(w.day(30, bsgConfig).picks.map((p) => p.topicId)).not.toContain("bsg");
+    w.pass1("bs", 30);
+    const today = w.day(31, bsgConfig);
+    expect(today.dayKind).toBe("mixed");
+    expect(today.picks.map((p) => p.topicId)).toContain("bsg");
   });
 });
 

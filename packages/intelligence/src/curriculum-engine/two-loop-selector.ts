@@ -29,7 +29,13 @@
  * Derived, no new state: a non-basic pattern is introduced once it has an
  * attempt or is at pass ≥ 1; its block is the first 2–4 pass-1 problems
  * (Easy first) and is done once that many of the topic's problems are
- * covered. A topic marked covered by an import with no attempts (Bit
+ * covered. A block with a gap of `staleBlockDays` or more between its
+ * attempts (or since the last one) is interrupted for good: its pass-1
+ * problems join mixed days instead and it never becomes a block day again
+ * (D14, from the P8.2 dry run on live, where three patterns started in July
+ * would otherwise run before DP). A
+ * started pattern is only served once its hard prerequisites are at pass ≥ 1
+ * (D13 decision 1). A topic marked covered by an import with no attempts (Bit
  * Manipulation in the dev DB) is not yet introduced.
  *
  * The `why` of a mixed day never names a pattern (§6.4).
@@ -120,6 +126,8 @@ export interface TwoLoopConfig {
   laterOrder: readonly string[];
   /** May start while the cap is full (D13: DP (1D)). */
   capExemptTopics: readonly string[];
+  /** A block untouched this long is interrupted and joins mixed days (D14). */
+  staleBlockDays: number;
   pass: TopicPassConfig;
 }
 
@@ -133,9 +141,11 @@ export const DEFAULT_TWO_LOOP_CONFIG: TwoLoopConfig = {
   coreOrder: CORE_TOPIC_ORDER,
   laterOrder: LATER_TOPIC_ORDER,
   capExemptTopics: ["Dynamic Programming (1D)"],
+  staleBlockDays: 14,
   pass: DEFAULT_TOPIC_PASS_CONFIG,
 };
 
+const DAY_MS = 86_400_000;
 const RANK: Record<TopicDifficulty, number> = { Easy: 0, Medium: 1, Hard: 2 };
 const rank = (p: PassProblem) => RANK[p.difficulty ?? "Medium"];
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -148,6 +158,8 @@ interface TopicView {
   introduced: boolean;
   /** Most recent attempt, ms; -Infinity if never (sorts first: least recent). */
   lastPracticed: number;
+  /** Longest gap between the topic's attempts, or since the last one, ms (D14). */
+  longestGap: number;
   /** Problem ids attempted at least once. */
   seen: Set<string>;
 }
@@ -161,11 +173,13 @@ export function selectTwoLoopDay(
   const problemTopic = new Map<string, string>();
   for (const t of topics) for (const p of t.problems) problemTopic.set(p.id, t.id);
   const lastByTopic = new Map<string, number>();
+  const timesByTopic = new Map<string, number[]>();
   const seenByTopic = new Map<string, Set<string>>();
   for (const a of attempts) {
     const tid = problemTopic.get(a.problemId);
     if (!tid) continue;
     lastByTopic.set(tid, Math.max(lastByTopic.get(tid) ?? -Infinity, a.solvedAt));
+    timesByTopic.set(tid, [...(timesByTopic.get(tid) ?? []), a.solvedAt]);
     const seen = seenByTopic.get(tid) ?? new Set<string>();
     seen.add(a.problemId);
     seenByTopic.set(tid, seen);
@@ -173,6 +187,13 @@ export function selectTwoLoopDay(
   const basicIds = new Set(
     config.basicTopics.map((n) => findTopicByName(n, topics)?.id).filter((id): id is string => !!id),
   );
+  const longestGap = (times: number[] | undefined): number => {
+    if (!times || times.length === 0) return 0;
+    const sorted = [...times].sort((a, b) => a - b);
+    let gap = now - sorted[sorted.length - 1];
+    for (let i = 1; i < sorted.length; i++) gap = Math.max(gap, sorted[i] - sorted[i - 1]);
+    return gap;
+  };
   for (const t of topics) {
     const pass = topicPass(t, attempts, reviews, now, config.pass);
     byId.set(t.id, {
@@ -181,6 +202,7 @@ export function selectTwoLoopDay(
       basic: basicIds.has(t.id),
       introduced: pass.pass >= 1 || pass.evidence.attempts > 0,
       lastPracticed: lastByTopic.get(t.id) ?? -Infinity,
+      longestGap: longestGap(timesByTopic.get(t.id)),
       seen: seenByTopic.get(t.id) ?? new Set(),
     });
   }
@@ -211,6 +233,8 @@ export function selectTwoLoopDay(
     const size = Math.min(v.topic.problems.length, config.blockMax, Math.max(config.blockMin, needed));
     return { size, covered: p1.covered, done: p1.covered >= size };
   };
+  /** D14: the block was left for `staleBlockDays` or more at some point. */
+  const stale = (v: TopicView) => v.longestGap >= config.staleBlockDays * DAY_MS;
 
   /** Next uncovered problems toward pass 1, Easy first (Hard only where pass 1 needs it). */
   const pass1Next = (v: TopicView): PassProblem[] => {
@@ -286,7 +310,15 @@ export function selectTwoLoopDay(
     // D13's typical day: one problem from an open pattern, then the basics
     // offer (Today keeps the offer past its budget), then the rest.
     const pool = views
-      .filter((v) => isOpen(v) && !v.basic && v.introduced && blockOf(v).done && pass1Next(v).length > 0)
+      .filter(
+        (v) =>
+          isOpen(v) &&
+          !v.basic &&
+          v.introduced &&
+          (blockOf(v).done || stale(v)) &&
+          prereqsAt(v, 1) &&
+          pass1Next(v).length > 0,
+      )
       .sort(byRecency);
     if (pool[0]) add(pick(pass1Next(pool[0])[0], pool[0], "pool", false));
     add(guardPick(used));
@@ -336,7 +368,16 @@ export function selectTwoLoopDay(
   // 3. Exposure loop: a running block, or a new one.
   const introOrder = consolidationDone ? later : consolidating ? [] : core;
   const running = views
-    .filter((v) => !v.basic && v.introduced && v.pass.pass < 1 && !blockOf(v).done && pass1Next(v).length > 0)
+    .filter(
+      (v) =>
+        !v.basic &&
+        v.introduced &&
+        v.pass.pass < 1 &&
+        !blockOf(v).done &&
+        !stale(v) &&
+        prereqsAt(v, 1) &&
+        pass1Next(v).length > 0,
+    )
     .sort((a, b) => idx(a) - idx(b))[0];
   const exempt = new Set(
     config.capExemptTopics.map((n) => findTopicByName(n, topics)?.id).filter((id): id is string => !!id),

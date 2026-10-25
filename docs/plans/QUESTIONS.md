@@ -2,6 +2,7 @@
 ## Open
 - [D9] Allow Notion reads in the worktree — default no; use dev DB only. Asked 2026-10-19. Runs waiting: 0
 ## Answered
+- [D14] → 2026-10-25, from the P8.2 dry run on live: patterns started before the new curriculum and left for 14+ days (DFS, Prefix Sum, Binary Search + Greedy, all July) don't resume as block days; their pass-1 problems join mixed days, hidden. A recently practised block (Greedy + Sorting with Prefix) still finishes as a block. Any started pattern waits while a hard prerequisite is below pass 1 (D13 decision 1). Santosh chose "Finish recent, mix stale".
 - [D13] → Approved 2026-10-25 with changes (topic-tiers.md §6): basics must reach pass 1 before counting as prerequisites and an open basic counts against the 3-open cap; Top-K is the heap entry point; core = all 21; DP early; DP (1D) is introduced now alongside the six open basics, and while any basic is below pass 1 Today offers at least one basics problem a day (skipping is fine, nothing piles up).
 - [D4] → No fixed count. Pass 2 = every problem that needed help re-solved clean in a later session, plus up to 2 unseen problems solved clean first try. Answered 2026-10-25 with the learning model in plan §6; rules in P7.3.
 - [D6] → Dropped. Santosh: over-engineering. P6.4 is not built. Answered 2026-10-25.
