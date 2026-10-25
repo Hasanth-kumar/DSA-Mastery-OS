@@ -1,6 +1,6 @@
 # Topic tiers — introduction order and hard prerequisites (P7.1)
 
-**Status: draft for Santosh's approval** (QUESTIONS.md [D13]). Nothing in Phase 7 builds on it until approved.
+**Status: approved by Santosh 2026-10-25** (QUESTIONS.md [D13]), with the changes in §6. Phase 7 builds on it.
 
 Built from the 50 topics in the dev DB (2026-10-25). Two things only, per plan §6.2:
 
@@ -11,7 +11,9 @@ Built from the 50 topics in the dev DB (2026-10-25). Two things only, per plan �
 
 ## 1. Basics — consolidate later (no intro block)
 
-Patterns you have already started or called familiar. They are **not** introduced again as a block and **don't count against the 3-open-patterns cap** (P7.4). They come back in the consolidation loop, with Greedy and DP thinking, until each reaches pass 2. As prerequisites they count as **satisfied** (decision 1).
+Patterns you have already started or called familiar. They are **not** introduced again as a block (no intro, pattern hidden), but a basic below pass 1 **is open**: it counts against the 3-open-patterns cap and only counts as a prerequisite once it reaches pass 1 (decision 1). After pass 1 they come back in the consolidation loop, with Greedy and DP thinking, until each reaches pass 2.
+
+On 2026-10-25, six basics were below pass 1 (23 problems in total): Sliding Window 3 to go, Sorting + Two Pointers 3, Hashing + Set/Map 4, Counting / Frequency Map 5, Binary Search 6, String Matching 2. Two Pointers, Fast & Slow, Binary Search + Prefix Sum, Recursion & Backtracking and BFS were already at pass 1, as was Greedy Sorting (core #1).
 
 | Pattern | Problems | Covered now | Pass 1 needs |
 |---|---|---|---|
@@ -28,6 +30,8 @@ Patterns you have already started or called familiar. They are **not** introduce
 | String Matching | 4 (2E · 0M · 2H) | 0 of 4 | 2 |
 
 ## 2. Core — the exposure loop, in this order
+
+**Starting set (decision 5):** DP (1D) is introduced now, alongside the six open basics, even though they fill the cap. After that, nothing new is introduced until open patterns drop below 3. While any basic is below pass 1, Today **offers** at least one basics problem a day; skipping it is fine and nothing piles up.
 
 Introduced one at a time with a short block (2–4 problems, pattern shown), at most 3 below pass 1 at once. A pattern is skipped (not blocked) while a hard prerequisite is below pass 1; the next eligible one is taken. The consolidation loop starts when all of these are at pass 1.
 
@@ -115,9 +119,10 @@ Those edges are "related" links for the picture; these are only "built from". Dr
 
 Added: Top-K → Greedy with Heap and Dijkstra; Dijkstra → Bellman-Ford and Floyd-Warshall (same shortest-path ideas; replaces BFS → Bellman-Ford); DFS → Binary Lifting.
 
-## 6. Decisions for Santosh
+## 6. Decisions (Santosh, 2026-10-25)
 
-1. **Basics count as satisfied prerequisites.** You called them familiar, but in the app several are well below pass 1 (Binary Search 0 of 8 covered, Sliding Window 1 of 13). If they had to reach pass 1 first, Binary Search + Greedy and Binary Search on Matrix would wait on Binary Search, and the 11 basics would fill the 3-open cap so nothing new could start. *Proposed: satisfied; they return in the consolidation loop.*
-2. **Top-K Pattern is the heap entry point.** "Heap (Priority Queue)" has only 2 problems, both Hard; as a prerequisite it would block Top-K, Greedy with Heap and Dijkstra behind two Hards (pass 1 of a < 4-problem topic = all of them). *Proposed: Top-K (1E · 5M) is the prerequisite instead; the Heap topic moves to Later.*
-3. **Core size.** 21 patterns before the consolidation loop starts. At 1–2 problems a day that is months. *Alternative: end the core at #13 (DP on Grids) for a first round, then consolidate, then do #14–21.*
-4. **DP order.** DP (1D) is #2 and DP on Subsequences #8 (your "DP early" direction). Say if you'd rather finish Greedy and the graph basics first.
+1. **Basics must reach pass 1 before they count as prerequisites**, and an open basic counts against the 3-open cap. (The draft proposed treating them as satisfied; Santosh chose pass 1 first.) So Binary Search + Greedy and Binary Search on Matrix wait for Binary Search.
+2. **Top-K Pattern is the heap entry point** (as proposed). "Heap (Priority Queue)" has only 2 problems, both Hard; Top-K (1E · 5M) is the prerequisite for Greedy with Heap and Dijkstra instead, and the Heap topic is in Later.
+3. **Core size: all 21** before the consolidation loop starts (about 86 problems to pass 1).
+4. **DP early** (as proposed): DP (1D) is #2, DP on Subsequences #8.
+5. **DP (1D) starts now, mixed with the basics.** Its only hard prerequisite, Recursion & Backtracking, is at pass 1 (10 of 10). It is the one exception to the cap: introduced alongside the six open basics. A typical day: a due re-solve, one DP problem, one basics problem, one at a time. DP's short block (2–4 problems, pattern shown) runs first; then mixed days with patterns hidden. While a basic is below pass 1, Today offers at least one basics problem a day; skipping it costs nothing (no backlog), it only delays the next introduction (DFS).

@@ -1,8 +1,8 @@
 # Questions for Santosh
 ## Open
-- [D13] Approve `docs/plans/topic-tiers.md` (P7.1): the introduction order (11 basics, 21 core, 18 later), the 30 hard prerequisites, and its four decisions (basics count as satisfied prerequisites; Top-K is the heap entry point; core size; DP order). P7.2–P7.5 wait on it. Asked 2026-10-25. Runs waiting: 0
 - [D9] Allow Notion reads in the worktree — default no; use dev DB only. Asked 2026-10-19. Runs waiting: 0
 ## Answered
+- [D13] → Approved 2026-10-25 with changes (topic-tiers.md §6): basics must reach pass 1 before counting as prerequisites and an open basic counts against the 3-open cap; Top-K is the heap entry point; core = all 21; DP early; DP (1D) is introduced now alongside the six open basics, and while any basic is below pass 1 Today offers at least one basics problem a day (skipping is fine, nothing piles up).
 - [D4] → No fixed count. Pass 2 = every problem that needed help re-solved clean in a later session, plus up to 2 unseen problems solved clean first try. Answered 2026-10-25 with the learning model in plan §6; rules in P7.3.
 - [D6] → Dropped. Santosh: over-engineering. P6.4 is not built. Answered 2026-10-25.
 - [D7] → Redefined 2026-10-25: tiers are only an introduction order plus a short list of hard prerequisites (plan P7.1, §6.2). The agent asks for approval of `topic-tiers.md` when P7.1 produces it.

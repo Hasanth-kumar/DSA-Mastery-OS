@@ -28,7 +28,7 @@
 | P6.2 | done | df06b1d | takeaway on attempt, appended to existing note, shown on re-solve |
 | P6.3 | done | df06b1d | `MistakeTag` single source; +greedy-invariant, +loop-bounds |
 | P6.4 | dropped | | D6: not built |
-| P7.1 | waiting | | `topic-tiers.md` drafted; awaiting approval [D13] |
+| P7.1 | done | 5619e0e | `topic-tiers.md` approved with changes [D13] |
 | P7.2 | todo | | |
 | P7.3 | todo | | |
 | P7.4 | todo | | |
@@ -41,7 +41,8 @@
 ### 2026-10-25 — P7.1 Introduction order and hard prerequisites (draft)
 - Did: `docs/plans/topic-tiers.md`, generated from the 50 dev-DB topics with problem counts and the D3 pass-1 size of each. Three groups: **Basics** (11 started or familiar patterns: no intro block, outside the 3-open cap, count as satisfied prerequisites), **Core** (21, in exposure-loop order: Greedy Sorting, DP 1D, DFS, Prefix Sum, Stack + String, Monotonic Stack, Top-K, DP on Subsequences, …; 86 problems to pass 1), **Later** (18: advanced, rare, or too few problems). 30 hard prerequisites, checked by script: all 50 names match the DB exactly, each appears once, and every prerequisite comes earlier in the order or is a basic. Section 5 lists where it differs from `graph-edges.ts`.
 - Found while drafting: if basics had to reach pass 1 before counting as prerequisites, the 11 of them would fill P7.4's 3-open cap and nothing new could be introduced; and "Heap (Priority Queue)" is 2 Hard problems only, so as a prerequisite it would block Top-K, Greedy with Heap and Dijkstra. Both are decisions in the doc (§6).
-- Next: Santosh approves or edits [D13]; then P7.2.
+- Santosh approved it the same day with changes (D13, `topic-tiers.md` §6): basics must reach pass 1 before counting as prerequisites and hold the 3-open cap; Top-K as heap entry; all 21 core; DP early; DP (1D) introduced now alongside the six open basics, with at least one basics problem offered a day (skipping is free). Recorded in the plan's P7.4 rules.
+- Next: P7.2.
 
 ### 2026-10-25 — Phase 6: help level, pattern guess, takeaway, one mistake vocabulary (P6.1–P6.3)
 - Santosh asked to continue with Phase 6.
