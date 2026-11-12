@@ -37,7 +37,10 @@ export async function notesRoutes(
   app.post<{ Params: { id: string } }>(
     "/problems/:id/note/template",
     async (request, reply) => {
-      const result = ctx.obsidianNotes.createTemplateForProblem(request.params.id);
+      const result = ctx.obsidianNotes.createTemplateForProblem(
+        request.params.id,
+        ctx.config.flags.takeawayField ? ctx.attemptRepo.takeawaysFor(request.params.id) : [],
+      );
       if (!result.created) {
         return reply.status(409).send({ error: result.reason ?? "Not created" });
       }

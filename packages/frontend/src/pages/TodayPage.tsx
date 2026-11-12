@@ -24,6 +24,9 @@ import { formatRelativeTime } from "../lib/formatRelative.js";
 import { formatTodayDate } from "../lib/greeting.js";
 import {
   loadStarts,
+  problemIdsWithTimers,
+  retainStarts,
+  sameStarts,
   saveStarts,
   sessionsThisMonth,
   studyHoursThisMonth,
@@ -97,7 +100,7 @@ type Flow =
       /** P6.1: the row's pattern was hidden, so capture asks for a guess first. */
       hiddenPattern?: boolean;
     }
-  | { kind: "note-offer"; problemId: string; problemName: string }
+  | { kind: "note-offer"; problemId: string; problemName: string; takeawayNeedsNote?: boolean }
   | { kind: "revision-offer"; problem: RevisionProblem }
   | { kind: "revision-active"; problem: RevisionProblem };
 
@@ -235,30 +238,21 @@ export function TodayPage({ onOpenCoach }: Props) {
     };
   }, [plan]);
 
-  // Drop start timers for problems that aren't on today's plan — leftover
+  // Drop start timers for problems that aren't on screen — leftover
   // localStorage entries were pinning the WARM-UP→FOCUS strip open forever.
+  // The queue's rows (Easy-first, basics offer, mixed picks) must count;
+  // they are not the old suggestedProblems list.
+  const showingQueue = queue != null;
   useEffect(() => {
     if (!plan) return;
-    const allowed = new Set([
-      ...plan.suggestedProblems.map((p) => p.problemId),
-      // P4.2: a started re-solve keeps its timer too.
-      ...(plan.resolveSlots ?? []).map((s) => s.problemId),
-    ]);
+    const allowed = problemIdsWithTimers(plan, showingQueue);
     setStarts((prev) => {
-      const next: Record<string, number> = {};
-      for (const [id, startedAt] of Object.entries(prev)) {
-        if (allowed.has(id)) next[id] = startedAt;
-      }
-      // One problem at a time: older timers from before the rule keep only the latest.
-      if (singleActive) {
-        const latest = Object.entries(next).sort((a, b) => b[1] - a[1])[0];
-        for (const id of Object.keys(next)) if (id !== latest?.[0]) delete next[id];
-      }
-      if (Object.keys(next).length === Object.keys(prev).length) return prev;
+      const next = retainStarts(prev, allowed, singleActive);
+      if (sameStarts(prev, next)) return prev;
       saveStarts(next);
       return next;
     });
-  }, [plan, singleActive]);
+  }, [plan, showingQueue, singleActive]);
 
   const startProblem = (problemId: string) => {
     if (singleActive && activeId && activeId !== problemId) return;
@@ -281,7 +275,7 @@ export function TodayPage({ onOpenCoach }: Props) {
   const blockedBy = (problemId: string): string | null => {
     if (!singleActive || !activeId || activeId === problemId) return null;
     return (
-      plan?.suggestedProblems.find((p) => p.problemId === activeId)?.name ??
+      rows.find((p) => p.problemId === activeId)?.name ??
       plan?.resolveSlots?.find((s) => s.problemId === activeId)?.name ??
       "the running problem"
     );
@@ -780,11 +774,12 @@ export function TodayPage({ onOpenCoach }: Props) {
                       : undefined
                   }
                   takeawayField={flags.takeawayField}
-                  onDone={() =>
+                  onDone={(_tagged, takeawayNeedsNote) =>
                     setFlow({
                       kind: "note-offer",
                       problemId: flow.problemId,
                       problemName: flow.problemName,
+                      takeawayNeedsNote,
                     })
                   }
                 />
@@ -808,7 +803,16 @@ export function TodayPage({ onOpenCoach }: Props) {
           {flow.kind === "note-offer" && (
             <div className="panel-v2 note-offer flow-reveal" style={{ marginBottom: "1.4rem" }}>
               <span>
-                Capture your insight on <strong>{flow.problemName}</strong> in Obsidian?
+                {flow.takeawayNeedsNote ? (
+                  <>
+                    Your takeaway is saved, but <strong>{flow.problemName}</strong> has no note
+                    yet. Create one to keep it in Obsidian?
+                  </>
+                ) : (
+                  <>
+                    Capture your insight on <strong>{flow.problemName}</strong> in Obsidian?
+                  </>
+                )}
               </span>
               <div className="btn-row">
                 <button

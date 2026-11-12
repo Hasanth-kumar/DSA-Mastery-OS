@@ -262,7 +262,11 @@ export const api = {
     },
   ) =>
     invalidating(
-      request<{ attempt: { id: string; mistakeTag: string | null } }>(
+      request<{
+        attempt: { id: string; mistakeTag: string | null };
+        /** P6.2: the takeaway was saved but the problem has no note to hold it yet. */
+        takeawayNeedsNote?: boolean;
+      }>(
         `/api/attempts/${attemptId}/mistake`,
         { method: "PATCH", body: JSON.stringify(input) },
       ),

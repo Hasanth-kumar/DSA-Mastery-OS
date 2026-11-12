@@ -110,9 +110,13 @@ export class ObsidianNoteService {
 
   /**
    * Generate a pre-filled note template for a just-logged problem (2.4).
-   * New files only — never overwrites.
+   * New files only — never overwrites. Takeaways saved before the note
+   * existed (P6.2) are written into its `## Takeaways` section.
    */
-  createTemplateForProblem(problemId: string): NoteTemplateResult {
+  createTemplateForProblem(
+    problemId: string,
+    takeaways: { date: Date; text: string }[] = [],
+  ): NoteTemplateResult {
     if (!this.vault?.isConfigured()) {
       return { created: false, reason: "Obsidian vault not configured" };
     }
@@ -120,8 +124,23 @@ export class ObsidianNoteService {
     if (!problem) {
       return { created: false, reason: "Problem not found" };
     }
-    if (this.noteRepo.findByProblemId(problemId)) {
-      return { created: false, reason: "A note for this problem already exists" };
+    const linked = this.noteRepo.findByProblemId(problemId);
+    if (linked) {
+      if (noteBelongsToProblem(linked, problem)) {
+        return { created: false, reason: "A note for this problem already exists" };
+      }
+      // A pattern write-up can share the problem's opening words ("Binary Search
+      // + Prefix Sum - Basic Stuff"). Drop that link so it cannot block a real note.
+      this.noteRepo.upsertByPath({
+        path: linked.path,
+        title: linked.title,
+        problemId: null,
+        topicId: null,
+        frontmatter: storedFrontmatter(linked.frontmatter),
+        content: linked.content ?? undefined,
+        contentHash: linked.contentHash ?? undefined,
+        matchedBy: null,
+      });
     }
 
     const slug = slugifyProblemName(problem.name);
@@ -140,7 +159,11 @@ difficulty: ${(problem.difficulty ?? "medium").toLowerCase()}
 ## Mistake
 
 ## Key insight
-`;
+${
+  takeaways.length > 0
+    ? `\n## Takeaways\n${takeaways.map((t) => `${takeawayLine(t.text, t.date)}\n`).join("")}`
+    : ""
+}`;
 
     const topicDir = topicName ? this.vault.resolveTopicDirectory(topicName) : undefined;
     const relativePath = this.vault.createNoteFile(problem.name, content, topicDir);
@@ -158,7 +181,8 @@ difficulty: ${(problem.difficulty ?? "medium").toLowerCase()}
   /**
    * P6.2: append a dated takeaway line to the problem's EXISTING note, under a
    * `## Takeaways` heading at the end of the file. Append-only: nothing already
-   * in the note is changed, and no note is created when there is none.
+   * in the note is changed. When there is no note, nothing is written here:
+   * the takeaway stays on the attempt and goes into the note once it is created.
    */
   appendTakeaway(problemId: string, takeaway: string, date: Date): boolean {
     if (!this.vault?.isConfigured()) return false;
@@ -166,7 +190,7 @@ difficulty: ${(problem.difficulty ?? "medium").toLowerCase()}
     if (!note) return false;
     const current = this.vault.readNote(note.path);
     if (!current) return false;
-    const line = `- ${date.toISOString().slice(0, 10)}: ${takeaway.replace(/\s+/g, " ").trim()}`;
+    const line = takeawayLine(takeaway, date);
     const headings = current.content.match(/^## .*$/gm) ?? [];
     const underTakeaways = headings[headings.length - 1]?.trim() === "## Takeaways";
     const text = `${current.content.endsWith("\n") ? "" : "\n"}${
@@ -212,8 +236,9 @@ difficulty: ${(problem.difficulty ?? "medium").toLowerCase()}
 }
 
 /**
- * Filename → problem matching, mirroring the GitHub solution matcher's
- * exact-slug then unique-substring strategy.
+ * Filename → problem matching. Exact slug only (case and punctuation folded).
+ * A longer title that merely contains a shorter problem name is left unmatched:
+ * "Binary Search + Prefix Sum - Basic Stuff" is not the problem "Binary Search".
  */
 export function matchNoteTitleToProblem(
   title: string,
@@ -221,15 +246,30 @@ export function matchNoteTitleToProblem(
 ): ProblemRow | null {
   const titleSlug = slugifyProblemName(title);
   if (!titleSlug) return null;
+  return problems.find((p) => slugifyProblemName(p.name) === titleSlug) ?? null;
+}
 
-  const exact = problems.find((p) => slugifyProblemName(p.name) === titleSlug);
-  if (exact) return exact;
+function takeawayLine(takeaway: string, date: Date): string {
+  return `- ${date.toISOString().slice(0, 10)}: ${takeaway.replace(/\s+/g, " ").trim()}`;
+}
 
-  const contains = problems.filter((p) => {
-    const slug = slugifyProblemName(p.name);
-    return slug.includes(titleSlug) || titleSlug.includes(slug);
-  });
-  if (contains.length === 1) return contains[0];
+function noteBelongsToProblem(note: NoteRow, problem: ProblemRow): boolean {
+  const tagged = storedFrontmatter(note.frontmatter)?.problem;
+  if (tagged && slugifyProblemName(tagged) === slugifyProblemName(problem.name)) return true;
+  return matchNoteTitleToProblem(note.title, [problem]) != null;
+}
 
-  return null;
+function storedFrontmatter(raw: string | null): Record<string, string> | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+    const out: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (typeof value === "string" && value) out[key] = value;
+    }
+    return out;
+  } catch {
+    return undefined;
+  }
 }

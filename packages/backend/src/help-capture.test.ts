@@ -213,6 +213,25 @@ describe("takeaway (P6.2)", () => {
     expect(ctx.attemptRepo.latestTakeaway("p-new")).toBe("no note here");
   });
 
+  it("no note: the save asks for one, and the created note carries the takeaway", async () => {
+    const { app } = setup();
+    const res = await capture(app, await done(app, "p-new"), { takeaway: "sort both, greedy match" });
+    expect(res.json().takeawayNeedsNote).toBe(true);
+
+    const created = await app.inject({ method: "POST", url: "/api/problems/p-new/note/template" });
+    expect(created.statusCode).toBe(201);
+    const notePath = join(vault, created.json().path);
+    expect(readFileSync(notePath, "utf-8")).toMatch(
+      /## Key insight\n\n## Takeaways\n- \d{4}-\d{2}-\d{2}: sort both, greedy match\n$/,
+    );
+
+    const next = await capture(app, await done(app, "p-new"), { takeaway: "smallest cookie first" });
+    expect(next.json().takeawayNeedsNote).toBe(false);
+    const note = readFileSync(notePath, "utf-8");
+    expect(note.match(/## Takeaways/g)).toHaveLength(1);
+    expect(note).toMatch(/: sort both, greedy match\n- .*: smallest cookie first\n$/);
+  });
+
   it("flag off: saved on the attempt but the note is not touched", async () => {
     const notePath = join(vault, "Max Consecutive Ones III.md");
     writeFileSync(notePath, "# Max Consecutive Ones III\n");

@@ -160,8 +160,14 @@ export async function sessionRoutes(
       return reply.status(404).send({ error: "Attempt not found" });
     }
     // P6.2: append the takeaway to the problem's existing note (dev vault in the worktree).
+    // With no note yet, the client offers to create one; the template carries the takeaway.
+    let takeawayNeedsNote = false;
     if (ctx.config.flags.takeawayField && attempt.takeaway) {
-      ctx.obsidianNotes.appendTakeaway(attempt.problemId, attempt.takeaway, new Date());
+      const appended = ctx.obsidianNotes.appendTakeaway(attempt.problemId, attempt.takeaway, new Date());
+      takeawayNeedsNote =
+        !appended &&
+        ctx.obsidianNotes.isConfigured() &&
+        !ctx.obsidianNotes.getNoteForProblem(attempt.problemId);
     }
     await ctx.sessionService.finalizeProblemAfterMistake(
       attempt.problemId,
@@ -173,7 +179,7 @@ export async function sessionRoutes(
     ctx.events.publish("session");
     ctx.events.publish("attempt");
     ctx.events.publish("problem");
-    return reply.send(serializeForJson({ attempt }));
+    return reply.send(serializeForJson({ attempt, takeawayNeedsNote }));
   });
 
   // P6.1: "Which pattern did you use?" on a hidden-pattern row. Stores the
