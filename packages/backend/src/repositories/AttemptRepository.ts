@@ -85,6 +85,14 @@ export class AttemptRepository {
     );
   }
 
+  /** P6.2: every non-empty takeaway for a problem, oldest first. */
+  takeawaysFor(problemId: string): { date: Date; text: string }[] {
+    return this.findByProblemId(problemId, 500)
+      .filter((a) => a.takeaway && a.takeaway.trim())
+      .reverse()
+      .map((a) => ({ date: new Date(a.solvedAt), text: a.takeaway! }));
+  }
+
   findById(id: string): AttemptRow | null {
     return (
       this.db

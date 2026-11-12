@@ -19,6 +19,20 @@ describe("ObsidianVault topic folders", () => {
     expect(resolveTopicFolderName("Recursion & Backtracking", existing)).toBe("BackTracking");
   });
 
+  it("does not file a shorter pattern into a longer pattern's folder", () => {
+    const prefixOnly = ["Binary Search + Prefix Sum"];
+    expect(resolveTopicFolderName("Binary Search", prefixOnly)).toBe("Binary Search");
+    expect(resolveTopicFolderName("Binary Search + Prefix Sum", ["Binary Search"])).toBe(
+      "Binary Search + Prefix Sum",
+    );
+
+    const both = ["Binary Search", "Binary Search + Prefix Sum"];
+    expect(resolveTopicFolderName("Binary Search", both)).toBe("Binary Search");
+    expect(resolveTopicFolderName("Binary Search + Prefix Sum", both)).toBe(
+      "Binary Search + Prefix Sum",
+    );
+  });
+
   it("creates a new folder name when no topic folder matches", () => {
     const existing = ["Arrays", "BackTracking"];
     expect(resolveTopicFolderName("Sliding Window", existing)).toBe("Sliding Window");

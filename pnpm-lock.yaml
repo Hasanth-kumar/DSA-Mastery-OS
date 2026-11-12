@@ -164,6 +164,9 @@ importers:
       vite:
         specifier: ^6.0.11
         version: 6.4.3(@types/node@22.19.19)(tsx@4.22.2)
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.4(@types/node@22.19.19)(tsx@4.22.2)
 
   packages/integrations:
     dependencies:

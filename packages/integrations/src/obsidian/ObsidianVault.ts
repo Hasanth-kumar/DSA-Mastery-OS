@@ -88,8 +88,21 @@ export function sanitizeFolderName(name: string): string {
 }
 
 /**
+ * `folderSlug` is a whole-token suffix of `topicSlug` and strictly shorter.
+ * "backtracking" matches "recursion-backtracking"; "binary-search" does not
+ * match "binary-search-prefix-sum" (that folder is a different pattern).
+ */
+function isTokenSuffix(topicSlug: string, folderSlug: string): boolean {
+  if (!folderSlug || folderSlug === topicSlug) return false;
+  if (!topicSlug.endsWith(folderSlug)) return false;
+  const boundary = topicSlug.length - folderSlug.length - 1;
+  return boundary >= 0 && topicSlug[boundary] === "-";
+}
+
+/**
  * Pick an existing topic folder under `Topics/` or derive a new folder name.
- * Matches case-insensitively, by slug, then by unique slug substring overlap.
+ * Matches case-insensitively, by slug, then by a unique token suffix
+ * (folder "BackTracking" for topic "Recursion & Backtracking").
  */
 export function resolveTopicFolderName(
   topicName: string,
@@ -109,10 +122,9 @@ export function resolveTopicFolderName(
   );
   if (slugMatches.length === 1) return slugMatches[0]!;
 
-  const fuzzy = existingFolderNames.filter((d) => {
-    const dSlug = slugifyProblemName(d);
-    return dSlug.length > 0 && (topicSlug.includes(dSlug) || dSlug.includes(topicSlug));
-  });
+  const fuzzy = existingFolderNames.filter((d) =>
+    isTokenSuffix(topicSlug, slugifyProblemName(d)),
+  );
   if (fuzzy.length === 1) return fuzzy[0]!;
 
   return sanitizeFolderName(trimmed);

@@ -21,7 +21,8 @@ interface Props {
   guessOptions?: { id: string; name: string }[];
   /** P6.2: show the one-line takeaway field. */
   takeawayField?: boolean;
-  onDone: (tagged: boolean) => void;
+  /** `takeawayNeedsNote`: the takeaway is saved but no note exists to hold it yet. */
+  onDone: (tagged: boolean, takeawayNeedsNote: boolean) => void;
 }
 
 const HELP_SOURCES = Object.keys(HELP_SOURCE_LABELS) as HelpSource[];
@@ -78,14 +79,14 @@ export function MistakeCaptureV2({
     setError(null);
     const list = smooth ? [] : [...tags];
     try {
-      await api.setMistake(attemptId, {
+      const res = await api.setMistake(attemptId, {
         tags: list,
         // Smooth = no mistakes; the help answer still counts.
         helpLevel: help,
         ...(help !== "none" && source ? { helpSource: source } : {}),
         ...(takeawayField && takeaway.trim() ? { takeaway: takeaway.trim() } : {}),
       });
-      onDone(list.length > 0);
+      onDone(list.length > 0, res.takeawayNeedsNote === true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
       setSaving(false);
